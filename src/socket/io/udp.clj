@@ -6,7 +6,7 @@
 
 (def max-payload 508)
 
-(defn socket [address port receiver options]
+(defn socket [address port receiver]
   "Naive implementation of UDP sockets."
 
   (let [datagram-socket
@@ -44,13 +44,14 @@
 (defn -main [& args]
   (let [receiver
         (fn [host port message]
-          ;;(print-bytes message)
-          (println "received [" host ":" port "] ->" (to-string (byte-array (take 50 message)))))
-        {:keys [send close]} (socket "224.0.0.251" 5353 receiver {:reuse-address true})]
+          (println "received [" host ":" port "] ------------" )
+          (print-bytes (byte-array (take 100 message))))
+
+        {:keys [send close]} (socket "224.0.0.251" 5353 receiver)]
 
     (println "listening")
     (send "224.0.0.251" 5353 "ping")
     (future
-      (Thread/sleep 30000)
+      (Thread/sleep 40000)
       (close)
       (shutdown-agents))))
