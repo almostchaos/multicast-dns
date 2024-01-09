@@ -1,9 +1,6 @@
 (ns dns.multicast.browse
   (:require
-    [aleph.udp :refer [socket]]
-    [clojure.string :as string]
-    [clojure.pprint :refer [pprint]]
-    [manifold.stream :refer [put! take! close!]]
+    [socket.io.udp :refer [socket]]
     [clj-commons.byte-streams :refer [to-string to-byte-array print-bytes]]
     [taoensso.timbre :refer [trace debug info warn error]]))
 
@@ -112,26 +109,28 @@
 
 (defn browse [protocol type & subtypes]
   (debug "starting browser ...")
+  (debug "listening for mdns response ...")
+
   (let [name (service-path protocol type subtypes)
         message-bytes (encode-srv-query-message name)
-        mdns-socket @(socket {:host "localhost" :port 10001})]
+        {send :send close :close}
+        (socket multicast-host mdns-port
+                (fn [host port message]
+                  (println "received [" host ":" port "] ------------")
+                  (print-bytes (byte-array (take 100 message)))))]
 
     (on-term-signal
       (info "stopping browser...")
-      (close! mdns-socket)
+      (close)
       (info "stopped browser"))
 
+
     (future
-      (let [receive-socket @(socket {:host multicast-host :port mdns-port :transport :epoll})]
-        (debug "listening for mdns response ...")
-        (pprint @(take! receive-socket))))
-
-    (debug "sending mdns request")
-    (put! mdns-socket {:host multicast-host :port mdns-port :message message-bytes})
+      (Thread/sleep 10000)
+      (debug "sending mdns request")
+    (send multicast-host mdns-port message-bytes)
     (debug "sent mdns request")
-    (print-bytes message-bytes)
-
-    message-bytes))
+    (print-bytes message-bytes))))
 
 (defn -main [& args]
-  (browse "tcp" "http"))
+  (browse "tcp" "octoprint"))
