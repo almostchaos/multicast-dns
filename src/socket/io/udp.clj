@@ -9,13 +9,13 @@
 (defn socket [address port receiver]
   "Naive implementation of UDP sockets."
 
-  (let [datagram-socket
-        (let [inet-address (InetAddress/getByName address)]
-          (if (.isMulticastAddress inet-address)
-            (let [multicast-socket (new MulticastSocket port)]
-              (.joinGroup multicast-socket inet-address)
-              multicast-socket)
-            (new DatagramSocket inet-address port)))]
+  (let [inet-address (InetAddress/getByName address)
+        multicast? (.isMulticastAddress inet-address)
+        datagram-socket (if multicast?
+                          (new MulticastSocket port)
+                          (new DatagramSocket port inet-address))]
+
+    (if multicast? (.joinGroup datagram-socket inet-address))
 
     (when-not (or (nil? address) (nil? receiver))
       (future
@@ -44,7 +44,7 @@
 (defn -main [& args]
   (let [receiver
         (fn [host port message]
-          (println "received [" host ":" port "] ------------" )
+          (println "received [" host ":" port "] ------------")
           (print-bytes (byte-array (take 100 message))))
 
         {:keys [send close]} (socket "224.0.0.251" 5353 receiver)]
