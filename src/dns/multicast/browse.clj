@@ -49,9 +49,15 @@
         path [(str "_" type) (str "_" protocol) "local"]]
     (concat prefix path)))
 
+(defn- first-byte [num]
+  (bit-and 255 num))
+
+(defn- second-byte [num]
+  (bit-and 255 (bit-shift-right num 8)))
+
 (defn- encode-header [header]
-  (byte-array [(bit-and 255 (bit-shift-right (:ID header) 8))
-               (bit-and 255 (:ID header))
+  (byte-array [(second-byte (:ID header))
+               (first-byte (:ID header))
                (-> 0
                    (bit-or (bit-shift-left (:QR header) 7))
                    (bit-or (bit-shift-left (:OPCODE header) 3))
@@ -65,47 +71,36 @@
                ;;one question per message is assumed
                0 1 0 0 0 0 0 0]))
 
-(defn- encode-message [header questions answers authority additional]
-  (let [header-bytes
-        (encode-header header)
-        message-bytes
-        (reduce
-          (fn [result-bytes question]
-            (let [path (:QNAME question)
-                  question-bytes
-                  (reduce
-                    (fn [path-bytes name]
-                      (let [name-bytes (to-byte-array name)
-                            count-bytes (byte-array [(alength name-bytes)])]
-                        (byte-array-concat path-bytes count-bytes name-bytes)))
-                    result-bytes path)]
-              (byte-array-concat result-bytes question-bytes [0])))
-          [] questions)]
-    (byte-array-concat header-bytes message-bytes)))
+(defn- encode-question [path type class]
+  (byte-array-concat
+    (reduce
+      (fn [path-bytes name]
+        (let [name-bytes (to-byte-array name)
+              count-bytes (byte-array [(alength name-bytes)])]
+          (byte-array-concat path-bytes count-bytes name-bytes)))
+      (byte-array 0) path)
+    [0 (second-byte type) (first-byte type) (second-byte class) (first-byte class)]))
 
 (defn- encode-srv-query-message [service-path]
-  (let [header {:ID      256                                ;;2 bytes number
-                :QR      (:disabled flag)
-                :OPCODE  (:inverse-query op-code)
-                :AA      (:disabled flag)
-                :TC      (:disabled flag)
-                :RD      (:disabled flag)
-                :RA      (:disabled flag)
-                :Z       (:disabled flag)
-                :AD      (:disabled flag)
-                :CD      (:disabled flag)
-                :RCODE   (:no-error r-code)
-                :QDCOUNT 1
-                :ANCOUNT 0
-                :NSCOUNT 0
-                :ARCOUNT 0}
-        question [{:QNAME  service-path
-                   :QTYPE  (:SRV resource-type)
-                   :QCLASS (:IN q-class)}]
-        answer []
-        authority []
-        additional []]
-    (encode-message header question answer authority additional)))
+  (byte-array-concat
+    (encode-header {:ID      256                            ;;2 bytes number
+                    :QR      (:disabled flag)
+                    :OPCODE  (:query op-code)
+                    :AA      (:disabled flag)
+                    :TC      (:disabled flag)
+                    :RD      (:disabled flag)
+                    :RA      (:disabled flag)
+                    :Z       (:disabled flag)
+                    :AD      (:disabled flag)
+                    :CD      (:disabled flag)
+                    :RCODE   (:no-error r-code)
+                    :QDCOUNT 1
+                    :ANCOUNT 0
+                    :NSCOUNT 0
+                    :ARCOUNT 0})
+    (encode-question service-path
+                     (:PTR resource-type)
+                     (:IN q-class))))
 
 (defn browse [protocol type & subtypes]
   (debug "starting browser ...")
@@ -113,24 +108,24 @@
 
   (let [name (service-path protocol type subtypes)
         message-bytes (encode-srv-query-message name)
+
         {send :send close :close}
         (socket multicast-host mdns-port
                 (fn [host port message]
                   (println "received [" host ":" port "] ------------")
-                  (print-bytes (byte-array (take 100 message)))))]
+                  (print-bytes message)))]
 
     (on-term-signal
       (info "stopping browser...")
       (close)
+      (shutdown-agents)
       (info "stopped browser"))
 
-
     (future
-      (Thread/sleep 10000)
+      (Thread/sleep 5000)
       (debug "sending mdns request")
-    (send multicast-host mdns-port message-bytes)
-    (debug "sent mdns request")
-    (print-bytes message-bytes))))
+      (send multicast-host mdns-port message-bytes)
+      (debug "sent mdns request"))))
 
 (defn -main [& args]
-  (browse "tcp" "octoprint"))
+  (browse "tcp" "spotify-connect"))
