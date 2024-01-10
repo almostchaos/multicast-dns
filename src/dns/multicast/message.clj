@@ -59,7 +59,8 @@
 
 (defn encode-header [& parameters]
   (let [header (apply hash-map parameters)]
-    (byte-array [(rand-int 255)
+    (byte-array [;;ID
+                 (rand-int 255)
                  (rand-int 255)
                  (bits-to-byte
                    (:QR header)
@@ -69,7 +70,7 @@
                    (:RD header))
                  (bits-to-byte
                    (:RA header)
-                   ;Z flag/reserved
+                   ;;Z flag/reserved
                    false false false
                    (:RCODE header))
                  ;;one question per message is assumed
