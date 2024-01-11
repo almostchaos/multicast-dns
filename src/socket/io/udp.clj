@@ -1,8 +1,8 @@
 (ns socket.io.udp
   (:require
-    [clj-commons.byte-streams :refer [to-string to-byte-array print-bytes]])
+    [clj-commons.byte-streams :refer [to-byte-array]])
   (:import
-    (java.net DatagramPacket DatagramSocket InetAddress InetSocketAddress MulticastSocket)))
+    (java.net DatagramPacket DatagramSocket InetAddress MulticastSocket)))
 
 (def max-payload 508)
 
