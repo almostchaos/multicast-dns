@@ -1,15 +1,7 @@
 {:paths   ["src"]
- :deps    {
-           com.taoensso/timbre    {:mvn/version "6.0.4"}
-           org.clojure/core.async {:mvn/version "1.6.673"}
-           com.fzakaria/slf4j-timbre {:mvn/version "0.4.0"}
-           aleph/aleph {:mvn/version "0.7.0-rc2"}
-           manifold/manifold {:mvn/version "0.4.1"}
+ :deps    {com.taoensso/timbre          {:mvn/version "6.0.4"}
+           org.clojure/core.async       {:mvn/version "1.6.673"}
+           com.fzakaria/slf4j-timbre    {:mvn/version "0.4.0"}
            org.clj-commons/byte-streams {:mvn/version "0.3.4"}
-           tick/tick {:mvn/version "RELEASE"}
-           }
- :aliases {
-           :run-app {:exec-fn browse/-main}
-           :test-async {:exec-fn test.async/-main}
-           }
- }
+           tick/tick                    {:mvn/version "RELEASE"}}
+ :aliases {:app {:exec-fn dns.multicast.browse/-main}}}
