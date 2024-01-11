@@ -1,6 +1,6 @@
 (ns dns.multicast.message
   (:require
-    [clj-commons.byte-streams :refer [to-string to-byte-array print-bytes]]))
+    [clj-commons.byte-streams :refer [to-byte-array]]))
 
 (defn- byte-array-concat [& byte-arrays]
   (byte-array (mapcat seq byte-arrays)))
@@ -12,8 +12,7 @@
         (bit-or (bit-shift-left (if bit 1 0) index) result))
       0
       (map-indexed
-        (fn [index bit]
-          [index bit])
+        (fn [index bit] [index bit])
         (take 8 (flatten bits))))))
 
 (defn- byte-to-bits [value]
