@@ -22,35 +22,31 @@
 (defn- byte-to-4-bits [value]
   (take 4 (byte-to-bits value)))
 
-(def flag {:disabled false
-           :enabled  true})
-
-(def op-code {:query         (byte-to-4-bits 0)
-              :inverse-query (byte-to-4-bits 1)
-              :status        (byte-to-4-bits 2)
-              :reserved      (byte-to-4-bits 3)})
-
-(def r-code {:no-error        (byte-to-4-bits 0)
-             :format-error    (byte-to-4-bits 1)
-             :server-failure  (byte-to-4-bits 2)
-             :name-error      (byte-to-4-bits 3)
-             :not-implemented (byte-to-4-bits 4)
-             :refused         (byte-to-4-bits 5)
-             :reserved        (byte-to-4-bits 6)})
-
-(def resource-type {:A    1
-                    :PTR  12
-                    :TXT  16
-                    :AAAA 28
-                    :SRV  33
-                    :NSEC 47
-                    :ANY  255})
-
-(def q-class {:IN  1
-              :CS  2
-              :CH  3
-              :HS  4
-              :ANY 255})
+(def flag:disabled false)
+(def flag:enabled true)
+(def op-code:query (byte-to-4-bits 0))
+(def op-code:inverse-query (byte-to-4-bits 1))
+(def op-code:status (byte-to-4-bits 2))
+(def op-code:reserved (byte-to-4-bits 3))
+(def r-code:no-error (byte-to-4-bits 0))
+(def r-code:format-error (byte-to-4-bits 1))
+(def r-code:server-failure (byte-to-4-bits 2))
+(def r-code:name-error (byte-to-4-bits 3))
+(def r-code:not-implemented (byte-to-4-bits 4))
+(def r-code:refused (byte-to-4-bits 5))
+(def r-code:reserved (byte-to-4-bits 6))
+(def resource-type:A 1)
+(def resource-type:PTR 12)
+(def resource-type:TXT 16)
+(def resource-type:AAAA 28)
+(def resource-type:SRV 33)
+(def resource-type:NSEC 47)
+(def resource-type:ANY 255)
+(def q-class:IN 1)
+(def q-class:CS 2)
+(def q-class:CH 3)
+(def q-class:HS 4)
+(def q-class:ANY 255)
 
 (defn service-path [protocol type subtypes]
   (let [prefix (if (nil? subtypes) [] (conj (map (partial str "_") subtypes) "sub"))
@@ -88,15 +84,15 @@
 
 (defn encode-srv-query-message [protocol type subtypes]
   (byte-array-concat
-    (encode-header :QR (:disabled flag)
-                   :OPCODE (:query op-code)
-                   :AA (:disabled flag)
-                   :TC (:disabled flag)
-                   :RD (:disabled flag)
-                   :RA (:disabled flag)
-                   :AD (:disabled flag)
-                   :CD (:disabled flag)
-                   :RCODE (:no-error r-code))
+    (encode-header :QR flag:disabled
+                   :OPCODE op-code:query
+                   :AA flag:disabled
+                   :TC flag:disabled
+                   :RD flag:disabled
+                   :RA flag:disabled
+                   :AD flag:disabled
+                   :CD flag:disabled
+                   :RCODE r-code:no-error)
     (encode-question (service-path protocol type subtypes)
-                     (:PTR resource-type)
-                     (:IN q-class))))
+                     resource-type:SRV
+                     q-class:IN)))
