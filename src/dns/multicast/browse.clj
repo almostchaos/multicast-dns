@@ -30,14 +30,12 @@
                 mdns-port
                 (fn [& parameters] (>!! received-messages parameters)))]
 
-    (future
-      (Thread/sleep 5000)
-      (debug "sending mdns request")
-      (send multicast-host mdns-port message-bytes)
-      (debug "sent mdns request"))
+    (debug "sending mdns request")
+    (send multicast-host mdns-port message-bytes)
+    (debug "sent mdns request")
 
     (results received-messages
-             (tick/>> (tick/instant) (tick/new-duration 30 :seconds))
+             (tick/>> (tick/instant) (tick/new-duration 60 :seconds))
              (fn []
                (close)
                (async/close! received-messages)))))
@@ -47,5 +45,5 @@
     (fn [[host port message]]
       (println "received [" host ":" port "] ------------")
       (print-bytes message))
-    (browse "udp" "sleep-proxy"))
+    (browse "tcp" "spotify-connect"))
   (shutdown-agents))
