@@ -40,18 +40,3 @@
 
      :close (fn []
               (.close datagram-socket))}))
-
-(defn -main [& args]
-  (let [receiver
-        (fn [host port message]
-          (println "received [" host ":" port "] ------------")
-          (print-bytes (byte-array (take 100 message))))
-
-        {:keys [send close]} (socket "224.0.0.251" 5353 receiver)]
-
-    (println "listening")
-    (send "224.0.0.251" 5353 "ping")
-    (future
-      (Thread/sleep 40000)
-      (close)
-      (shutdown-agents))))
