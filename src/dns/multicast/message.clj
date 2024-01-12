@@ -5,7 +5,7 @@
 (defn- byte-array-concat [& byte-arrays]
   (byte-array (mapcat seq byte-arrays)))
 
-(defn- bits-to-byte [& bits]
+(defn bits-to-byte [& bits]
   (byte
     (reduce
       (fn [result [index bit]]
@@ -16,10 +16,15 @@
         (take 8 (flatten bits))))))
 
 (defn- byte-to-bits [value]
-  (reverse (map (partial bit-test value) (range 8))))
+  (boolean-array (reverse (map (partial bit-test value) (range 8)))))
 
 (defn- byte-to-4-bits [value]
-  (take 4 (byte-to-bits value)))
+  (boolean-array (take 4 (byte-to-bits value))))
+
+(defn- bytes-to-int [bytes]
+  (reduce
+    (fn [result b]
+      (bit-or b (bit-shift-left result 8))) 0 bytes))
 
 (def flag:disabled false)
 (def flag:enabled true)
@@ -95,3 +100,26 @@
     (encode-question (service-path protocol type subtypes)
                      resource-type:SRV
                      q-class:IN)))
+
+(defn decode-header [header-bytes]
+  (let [[id-ms id-ls
+         flags-first flags-second
+         qd-count-ms qd-count-ls
+         an-count-ms an-count-ls
+         ns-count-ms ns-count-ls
+         ar-count-ms ar-count-ls] header-bytes
+        [qp-code-1 qp-code-2 qp-code-3 qp-code-4
+         aa tc rd] (byte-to-bits flags-first)
+        [ra z1 z2 z3
+         r-code-1 r-code-2 r-code-3 r-code-4] (byte-to-bits flags-second)]
+    {:ID      (bytes-to-int [id-ms id-ls])
+     :OPCODE  (bits-to-byte [qp-code-1 qp-code-2 qp-code-3 qp-code-4])
+     :AA      aa
+     :TC      tc
+     :RD      rd
+     :RA      ra
+     :RCODE   (bits-to-byte [r-code-1 r-code-2 r-code-3 r-code-4])
+     :QDCOUNT (bytes-to-int [qd-count-ms qd-count-ls])
+     :ANCOUNT (bytes-to-int [an-count-ms an-count-ls])
+     :NSCOUNT (bytes-to-int [ns-count-ms ns-count-ls])
+     :ARCOUNT (bytes-to-int [ar-count-ms ar-count-ls])}))
