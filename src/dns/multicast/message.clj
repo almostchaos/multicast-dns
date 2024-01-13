@@ -61,28 +61,15 @@
         tc (:TC header)
         rd (:RD header)
         ra (:RA header)]
-    (byte-array [;;ID
-                 (rand-int 255)
-                 (rand-int 255)
-                 (bits-to-byte
-                   qr
-                   (nth qp-code 3)
-                   (nth qp-code 2)
-                   (nth qp-code 1)
-                   (nth qp-code 0)
-                   aa
-                   tc
-                   rd)
-                 (bits-to-byte
-                   ra
-                   ;;Z flag/reserved
-                   false false false
-                   (nth r-code 3)
-                   (nth r-code 2)
-                   (nth r-code 1)
-                   (nth r-code 0))
-                 ;;one question per message is assumed
-                 0 1 0 0 0 0 0 0])))
+    (byte-array
+      [(rand-int 255)
+       (rand-int 255)
+       (bits-to-byte
+         qr (nth qp-code 3) (nth qp-code 2) (nth qp-code 1) (nth qp-code 0) aa tc rd)
+       (bits-to-byte
+         ra false false false (nth r-code 3) (nth r-code 2) (nth r-code 1) (nth r-code 0))
+       ;;one question per message is assumed
+       0 1 0 0 0 0 0 0])))
 
 (defn- encode-question [path type class]
   (byte-array-concat
