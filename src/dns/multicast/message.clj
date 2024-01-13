@@ -5,7 +5,7 @@
 (defn- byte-array-concat [& byte-arrays]
   (byte-array (mapcat seq byte-arrays)))
 
-(defn- bits-to-byte [& bits]
+(defn bits-to-byte [& bits]
   (byte
     (reduce
       (fn [result [index bit]]
@@ -13,7 +13,7 @@
       0
       (map-indexed
         (fn [index bit] [index bit])
-        (take 8 (flatten bits))))))
+        (take 8 bits)))))
 
 (defn- byte-to-bits [value]
   (boolean-array (reverse (map (partial bit-test value) (range 8)))))
@@ -53,21 +53,34 @@
 (def q-class:ANY 255)
 
 (defn- encode-header [& parameters]
-  (let [header (apply hash-map parameters)]
+  (let [header (apply hash-map parameters)
+        qp-code (:OPCODE header)
+        r-code (:RCODE header)
+        qr (:QR header)
+        aa (:AA header)
+        tc (:TC header)
+        rd (:RD header)
+        ra (:RA header)]
     (byte-array [;;ID
                  (rand-int 255)
                  (rand-int 255)
                  (bits-to-byte
-                   (:QR header)
-                   (:OPCODE header)
-                   (:AA header)
-                   (:TC header)
-                   (:RD header))
+                   qr
+                   (nth qp-code 3)
+                   (nth qp-code 2)
+                   (nth qp-code 1)
+                   (nth qp-code 0)
+                   aa
+                   tc
+                   rd)
                  (bits-to-byte
-                   (:RA header)
+                   ra
                    ;;Z flag/reserved
                    false false false
-                   (:RCODE header))
+                   (nth r-code 3)
+                   (nth r-code 2)
+                   (nth r-code 1)
+                   (nth r-code 0))
                  ;;one question per message is assumed
                  0 1 0 0 0 0 0 0])))
 
@@ -88,11 +101,12 @@
          an-count-ms an-count-ls
          ns-count-ms ns-count-ls
          ar-count-ms ar-count-ls] header-bytes
-        [qp-code-1 qp-code-2 qp-code-3 qp-code-4
-         aa tc rd] (byte-to-bits flags-first)
+        [qr qp-code-1 qp-code-2 qp-code-3
+         qp-code-4 aa tc rd] (byte-to-bits flags-first)
         [ra z1 z2 z3
          r-code-1 r-code-2 r-code-3 r-code-4] (byte-to-bits flags-second)]
     {:ID      (bytes-to-int [id-ms id-ls])
+     :QR      qr
      :OPCODE  (bits-to-byte [qp-code-1 qp-code-2 qp-code-3 qp-code-4])
      :AA      aa
      :TC      tc
