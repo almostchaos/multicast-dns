@@ -5,7 +5,7 @@
 (defn- byte-array-concat [& byte-arrays]
   (byte-array (mapcat seq byte-arrays)))
 
-(defn bits-to-byte [& bits]
+(defn- bits-to-byte [& bits]
   (byte
     (reduce
       (fn [result [index bit]]
@@ -52,12 +52,7 @@
 (def q-class:HS 4)
 (def q-class:ANY 255)
 
-(defn service-path [protocol type subtypes]
-  (let [prefix (if (nil? subtypes) [] (conj (map (partial str "_") subtypes) "sub"))
-        path [(str "_" type) (str "_" protocol) "local"]]
-    (concat prefix path)))
-
-(defn encode-header [& parameters]
+(defn- encode-header [& parameters]
   (let [header (apply hash-map parameters)]
     (byte-array [;;ID
                  (rand-int 255)
@@ -76,7 +71,7 @@
                  ;;one question per message is assumed
                  0 1 0 0 0 0 0 0])))
 
-(defn encode-question [path type class]
+(defn- encode-question [path type class]
   (byte-array-concat
     (reduce
       (fn [path-bytes name]
@@ -85,21 +80,6 @@
           (byte-array-concat path-bytes count-bytes name-bytes)))
       (byte-array 0) path)
     [0 0 type 0 class]))
-
-(defn encode-srv-query-message [protocol type subtypes]
-  (byte-array-concat
-    (encode-header :QR flag:disabled
-                   :OPCODE op-code:query
-                   :AA flag:disabled
-                   :TC flag:disabled
-                   :RD flag:disabled
-                   :RA flag:disabled
-                   :AD flag:disabled
-                   :CD flag:disabled
-                   :RCODE r-code:no-error)
-    (encode-question (service-path protocol type subtypes)
-                     resource-type:SRV
-                     q-class:IN)))
 
 (defn decode-header [header-bytes]
   (let [[id-ms id-ls
@@ -123,3 +103,25 @@
      :ANCOUNT (bytes-to-int [an-count-ms an-count-ls])
      :NSCOUNT (bytes-to-int [ns-count-ms ns-count-ls])
      :ARCOUNT (bytes-to-int [ar-count-ms ar-count-ls])}))
+
+(defn- decode-resource-record [resource-record-bytes]
+  )
+
+;specific message creation section
+(defn encode-srv-query-message [protocol type subtypes]
+  (let [prefix (if (nil? subtypes) [] (conj (map (partial str "_") subtypes) "sub"))
+        path [(str "_" type) (str "_" protocol) "local"]
+        service-path (concat prefix path)]
+    (byte-array-concat
+      (encode-header :QR flag:disabled
+                     :OPCODE op-code:query
+                     :AA flag:disabled
+                     :TC flag:disabled
+                     :RD flag:disabled
+                     :RA flag:disabled
+                     :AD flag:disabled
+                     :CD flag:disabled
+                     :RCODE r-code:no-error)
+      (encode-question service-path
+                       resource-type:SRV
+                       q-class:IN))))
