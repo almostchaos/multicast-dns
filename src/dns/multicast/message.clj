@@ -1,6 +1,6 @@
 (ns dns.multicast.message
   (:require
-    [clj-commons.byte-streams :refer [to-byte-array]]))
+    [clj-commons.byte-streams :refer [to-byte-array to-string]]))
 
 (defn- byte-array-concat [& byte-arrays]
   (byte-array (mapcat seq byte-arrays)))
@@ -81,7 +81,7 @@
       (byte-array 0) path)
     [0 0 type 0 class]))
 
-(defn decode-header [header-bytes]
+(defn- decode-header [header-bytes]
   (let [[id-ms id-ls
          flags-first flags-second
          qd-count-ms qd-count-ls
@@ -105,8 +105,46 @@
      :NSCOUNT (bytes-to-int [ns-count-ms ns-count-ls])
      :ARCOUNT (bytes-to-int [ar-count-ms ar-count-ls])}))
 
+(defn- decode-q-name [path-bytes]
+  (loop [name-bytes path-bytes
+         path []]
+    (if (= (first name-bytes) 0)
+      path
+      (let [name-length (first name-bytes)
+            name (take name-length (drop 1 name-bytes))
+            next-name-bytes (drop (+ 1 name-length) name-bytes)]
+        (recur next-name-bytes (concat path [name]))))))
+
+(defn- decode-questions [message-bytes question-count]
+  (if (> question-count 0)
+    (let [q-name (decode-q-name message-bytes)
+          q-name-length (+ 1
+                           (count q-name)
+                           (apply + (map count q-name)))
+          q-type (take 2 (drop q-name-length message-bytes))
+          q-type-end (+ q-name-length 2)
+          q-class (take 2 (drop q-type-end message-bytes))
+          q-class-end (+ q-type-end 2)
+          message-rest (drop q-class-end message-bytes)
+          question {:QNAME   (map to-string (map byte-array q-name))
+                    :QTYPE   (bytes-to-int q-type)
+                    :QCCLASS (bytes-to-int q-class)}]
+      (if (= count 1)
+        [question]
+        (concat
+          [question]
+          (decode-questions message-rest (- question-count 1)))))
+    []))
+
 (defn- decode-resource-record [resource-record-bytes]
   )
+
+(defn decode-message [message-bytes]
+  (let [header (decode-header (take 12 message-bytes))
+        question-count (:QDCOUNT header)
+        questions (decode-questions (drop 12 message-bytes) question-count)]
+    {:header    header
+     :questions questions}))
 
 ;specific message creation section
 (defn encode-srv-query-message [protocol type subtypes]
