@@ -120,7 +120,7 @@
   (if (> (count message-bytes) 5)
     (let [name-bytes (decode-q-name message-bytes)
           name-length (+ 1 (count name-bytes) (apply + (map count name-bytes)))
-          name (map to-string (map byte-array name-bytes))
+          name (->> name-bytes (map byte-array) (map to-string))
           bytes-after-name (drop name-length message-bytes)
           type (bytes-to-int (take 2 bytes-after-name))
           bytes-after-type (drop 2 bytes-after-name)
@@ -135,7 +135,7 @@
                 bytes-after-ttl (drop 4 bytes-after-class)
                 rd-length (bytes-to-int (take 2 bytes-after-ttl))
                 bytes-after-rd-length (drop 6 bytes-after-class)
-                data (to-string (byte-array (take rd-length bytes-after-rd-length)))
+                data (byte-array (take rd-length bytes-after-rd-length))
                 answer {:NAME name :TYPE type :CLASS class :TTL ttl :RDLENGTH rd-length :RDATA data}
                 bytes-after-data (drop rd-length bytes-after-rd-length)]
             (concat [answer] (decode-sections bytes-after-data 0 (- answer-count 1))))
