@@ -1,6 +1,7 @@
 (ns dns.multicast.message
   (:require
-    [clj-commons.byte-streams :refer [to-byte-array to-string]]))
+    [clj-commons.byte-streams :refer [to-byte-array to-string]]
+    [clojure.string :as string]))
 
 (defn- byte-array-concat [& byte-arrays]
   (byte-array (mapcat seq byte-arrays)))
@@ -115,38 +116,46 @@
             next-name-bytes (drop (+ 1 name-length) name-bytes)]
         (recur next-name-bytes (concat path [name]))))))
 
-(defn- decode-questions [message-bytes question-count]
-  (if (> question-count 0)
-    (let [q-name (decode-q-name message-bytes)
-          q-name-length (+ 1
-                           (count q-name)
-                           (apply + (map count q-name)))
-          q-type (take 2 (drop q-name-length message-bytes))
-          q-type-end (+ q-name-length 2)
-          q-class (take 2 (drop q-type-end message-bytes))
-          q-class-end (+ q-type-end 2)
-          message-rest (drop q-class-end message-bytes)
-          question {:QNAME   (map to-string (map byte-array q-name))
-                    :QTYPE   (bytes-to-int q-type)
-                    :QCCLASS (bytes-to-int q-class)}]
-      (if (= count 1)
-        [question]
-        (concat
-          [question]
-          (decode-questions message-rest (- question-count 1)))))
-    []))
+(defn- decode-sections [message-bytes question-count answer-count]
+  (if (> (count message-bytes) 5)
+    (let [name (decode-q-name message-bytes)
+          name-length (+ 1 (count name) (apply + (map count name)))
+          type (take 2 (drop name-length message-bytes))
+          type-end (+ name-length 2)
+          class (take 2 (drop type-end message-bytes))
+          class-end (+ type-end 2)
+          message-rest (drop class-end message-bytes)]
 
-(defn- decode-resource-record [resource-record-bytes]
-  )
+      (if (> question-count 0)
+        (let [question {:QNAME   (map to-string (map byte-array name))
+                        :QTYPE   (bytes-to-int type)
+                        :QCCLASS (bytes-to-int class)}]
+          (concat [question] (decode-sections message-rest (- question-count 1) answer-count)))
+        (if (> answer-count 0)
+          (let [ttl (bytes-to-int (take 4 message-rest))
+                rd-length (bytes-to-int (take 2 (drop 4 message-rest)))
+                data (to-string (byte-array (take rd-length (drop 6 message-rest))))
+                answer {:NAME  (map to-string (map byte-array name))
+                        :TYPE  (bytes-to-int type)
+                        :CLASS (bytes-to-int class)
+                        :TTL ttl
+                        :RDLENGTH rd-length
+                        :RDATA data}]
+            (concat [answer] (decode-sections (drop (+ 6 rd-length) message-rest) 0 (- answer-count 1))))
+          []))
+      )
+    []))
 
 (defn decode-message [message-bytes]
   (let [header (decode-header (take 12 message-bytes))
         question-count (:QDCOUNT header)
-        questions (decode-questions (drop 12 message-bytes) question-count)]
-    {:header    header
-     :questions questions}))
+        answer-count (:ANCOUNT header)
+        body (decode-sections (drop 12 message-bytes) question-count answer-count)]
+    {:header header
+     :body   body}))
 
 ;specific message creation section
+;---------------------------------
 (defn encode-srv-query-message [protocol type subtypes]
   (let [prefix (if (nil? subtypes) [] (conj (map (partial str "_") subtypes) "sub"))
         path [(str "_" type) (str "_" protocol) "local"]
@@ -163,4 +172,20 @@
                      :RCODE r-code:no-error)
       (encode-question service-path
                        resource-type:SRV
+                       q-class:IN))))
+
+(defn encode-ptr-query-message [name]
+  (let [service-path (string/split name #"\.")]
+    (byte-array-concat
+      (encode-header :QR flag:disabled
+                     :OPCODE op-code:query
+                     :AA flag:disabled
+                     :TC flag:disabled
+                     :RD flag:disabled
+                     :RA flag:disabled
+                     :AD flag:disabled
+                     :CD flag:disabled
+                     :RCODE r-code:no-error)
+      (encode-question service-path
+                       resource-type:PTR
                        q-class:IN))))
