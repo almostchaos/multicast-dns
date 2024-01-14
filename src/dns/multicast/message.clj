@@ -118,30 +118,27 @@
 
 (defn- decode-sections [message-bytes question-count answer-count]
   (if (> (count message-bytes) 5)
-    (let [name (decode-q-name message-bytes)
-          name-length (+ 1 (count name) (apply + (map count name)))
-          type (take 2 (drop name-length message-bytes))
-          type-end (+ name-length 2)
-          class (take 2 (drop type-end message-bytes))
-          class-end (+ type-end 2)
-          message-rest (drop class-end message-bytes)]
+    (let [name-bytes (decode-q-name message-bytes)
+          name-length (+ 1 (count name-bytes) (apply + (map count name-bytes)))
+          name (map to-string (map byte-array name-bytes))
+          bytes-after-name (drop name-length message-bytes)
+          type (bytes-to-int (take 2 bytes-after-name))
+          bytes-after-type (drop 2 bytes-after-name)
+          class (bytes-to-int (take 2 bytes-after-type))
+          bytes-after-class (drop 2 bytes-after-type)]
 
       (if (> question-count 0)
-        (let [question {:QNAME   (map to-string (map byte-array name))
-                        :QTYPE   (bytes-to-int type)
-                        :QCCLASS (bytes-to-int class)}]
-          (concat [question] (decode-sections message-rest (- question-count 1) answer-count)))
+        (let [question {:QNAME name :QTYPE type :QCCLASS class}]
+          (concat [question] (decode-sections bytes-after-class (- question-count 1) answer-count)))
         (if (> answer-count 0)
-          (let [ttl (bytes-to-int (take 4 message-rest))
-                rd-length (bytes-to-int (take 2 (drop 4 message-rest)))
-                data (to-string (byte-array (take rd-length (drop 6 message-rest))))
-                answer {:NAME  (map to-string (map byte-array name))
-                        :TYPE  (bytes-to-int type)
-                        :CLASS (bytes-to-int class)
-                        :TTL ttl
-                        :RDLENGTH rd-length
-                        :RDATA data}]
-            (concat [answer] (decode-sections (drop (+ 6 rd-length) message-rest) 0 (- answer-count 1))))
+          (let [ttl (bytes-to-int (take 4 bytes-after-class))
+                bytes-after-ttl (drop 4 bytes-after-class)
+                rd-length (bytes-to-int (take 2 bytes-after-ttl))
+                bytes-after-rd-length (drop 6 bytes-after-class)
+                data (to-string (byte-array (take rd-length bytes-after-rd-length)))
+                answer {:NAME name :TYPE type :CLASS class :TTL ttl :RDLENGTH rd-length :RDATA data}
+                bytes-after-data (drop rd-length bytes-after-rd-length)]
+            (concat [answer] (decode-sections bytes-after-data 0 (- answer-count 1))))
           []))
       )
     []))
