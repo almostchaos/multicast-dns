@@ -106,30 +106,35 @@
      :NSCOUNT (bytes-to-int [ns-count-ms ns-count-ls])
      :ARCOUNT (bytes-to-int [ar-count-ms ar-count-ls])}))
 
-(defn- decode-q-name [path-bytes]
-  (loop [name-bytes path-bytes
-         path []]
-    (if (= (first name-bytes) 0)
-      path
-      (let [name-length (first name-bytes)
-            name (take name-length (drop 1 name-bytes))
-            next-name-bytes (drop (+ 1 name-length) name-bytes)]
-        (recur next-name-bytes (concat path [name]))))))
+(defn- decode-q-name [path-bytes references]
+  (let [result (loop [name-bytes path-bytes
+                      path []]
+                 (if (= (first name-bytes) 0)
+                   path
+                   (let [name-length (first name-bytes)
+                         name (take name-length (drop 1 name-bytes))
+                         next-name-bytes (drop (+ 1 name-length) name-bytes)]
+                     (recur next-name-bytes (concat path [name])))))
+        length (+ 1 (count result) (apply + (map count result)))
+        name (->> result (map byte-array) (map to-string))
+        updated-references references]
+    [name length updated-references]))
 
-(defn- decode-sections [message-bytes question-count answer-count]
-  (if (> (count message-bytes) 5)
-    (let [name-bytes (decode-q-name message-bytes)
-          name-length (+ 1 (count name-bytes) (apply + (map count name-bytes)))
-          name (->> name-bytes (map byte-array) (map to-string))
+(defn- decode-sections [position message question-count answer-count references]
+  (if (> (count message) 5)
+    (let [message-bytes (drop position message)
+          [name name-length update-references] (decode-q-name message-bytes references)
           bytes-after-name (drop name-length message-bytes)
           type (bytes-to-int (take 2 bytes-after-name))
           bytes-after-type (drop 2 bytes-after-name)
           class (bytes-to-int (take 2 bytes-after-type))
-          bytes-after-class (drop 2 bytes-after-type)]
+          bytes-after-class (drop 2 bytes-after-type)
+          next-position (+ position name-length 2 2)]
 
       (if (> question-count 0)
         (let [question {:QNAME name :QTYPE type :QCCLASS class}]
-          (concat [question] (decode-sections bytes-after-class (- question-count 1) answer-count)))
+          (concat [question]
+                  (decode-sections next-position bytes-after-class (dec question-count) answer-count update-references)))
         (if (> answer-count 0)
           (let [ttl (bytes-to-int (take 4 bytes-after-class))
                 bytes-after-ttl (drop 4 bytes-after-class)
@@ -138,7 +143,8 @@
                 data (byte-array (take rd-length bytes-after-rd-length))
                 answer {:NAME name :TYPE type :CLASS class :TTL ttl :RDLENGTH rd-length :RDATA data}
                 bytes-after-data (drop rd-length bytes-after-rd-length)]
-            (concat [answer] (decode-sections bytes-after-data 0 (- answer-count 1))))
+            (concat [answer]
+                    (decode-sections next-position bytes-after-data 0 (dec answer-count) update-references)))
           []))
       )
     []))
@@ -147,7 +153,7 @@
   (let [header (decode-header (take 12 message-bytes))
         question-count (:QDCOUNT header)
         answer-count (:ANCOUNT header)
-        body (decode-sections (drop 12 message-bytes) question-count answer-count)]
+        body (decode-sections 12 message-bytes question-count answer-count {})]
     {:header header
      :body   body}))
 
@@ -168,7 +174,7 @@
                      :CD flag:disabled
                      :RCODE r-code:no-error)
       (encode-question service-path
-                       resource-type:SRV
+                       resource-type:PTR
                        q-class:IN))))
 
 (defn encode-ptr-query-message [name]
