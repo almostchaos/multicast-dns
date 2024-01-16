@@ -145,7 +145,7 @@
                 data (byte-array (take rd-length bytes-after-rd-length))
                 answer {:NAME name :TYPE type :CLASS class :TTL ttl :RDLENGTH rd-length :RDATA data}
                 bytes-after-data (drop rd-length bytes-after-rd-length)
-                next-position (+ name-end 2 2 4 2 2 rd-length)
+                next-position (+ name-end 2 2 4 2 rd-length)
                 remaining-answer-count (dec answer-count)]
             (concat [answer]
                     (decode-sections next-position message 0 remaining-answer-count)))
