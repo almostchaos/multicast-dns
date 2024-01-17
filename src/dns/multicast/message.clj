@@ -109,17 +109,20 @@
      :ARCOUNT (bytes-to-int [ar-count-ms ar-count-ls])}))
 
 
-(defn- decode-q-name [start message path]
-  (let [first-byte (int (nth message start))]
-    (case first-byte
-      0 path
-      -64 (let [next-start (nth message (+ 1 start))]
-            (concat path (decode-q-name next-start message path)))
-      (let [name (to-string (byte-array (take first-byte (drop (+ 1 start) message))))
-            next-start (+ start 1 first-byte)]
-        (decode-q-name next-start message (concat path [name]))))))
+(defn- decode-name
+  ([start message]
+   (decode-name start message []))
+  ([start message path]
+   (let [first-byte (nth message start)]
+     (case first-byte
+       0 path
+       -64 (let [next-start (nth message (inc start))]
+             (concat path (decode-name next-start message path)))
+       (let [name (to-string (byte-array (take first-byte (drop (inc start) message))))
+             next-start (+ start 1 first-byte)]
+         (decode-name next-start message (concat path [name])))))))
 
-(defn- calculate-name-storage [start message]
+(defn- name-storage-length [start message]
   (loop [position start count 0]
     (let [value (nth message position)]
       (cond
@@ -128,16 +131,16 @@
         :else (recur (inc position) (inc count))))))
 
 (defn- decode-data [type start length message]
-  (case type
-    resource-type:PTR (decode-q-name start message [])
-    resource-type:NSEC (decode-q-name start message [])
-    resource-type:A (string/join "." (take 4 (drop start message)))
-    (byte-array (take length (drop start message)))))
+  (cond
+    (= type resource-type:PTR) (decode-name start message)
+    (= type resource-type:NSEC) (decode-name start message)
+    (= type resource-type:A) (string/join "." (take 4 (drop start message)))
+    :else (byte-array (take length (drop start message)))))
 
 (defn- decode-sections [position message question-count answer-count]
   (if (> (alength message) position)
-    (let [name (decode-q-name position message [])
-          name-length (calculate-name-storage position message)
+    (let [name (decode-name position message)
+          name-length (name-storage-length position message)
           name-end (+ 1 name-length position)
           bytes-after-name (drop name-end message)
           type (bytes-to-int (take 2 bytes-after-name))
