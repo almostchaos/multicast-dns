@@ -23,9 +23,10 @@
   (boolean-array (take 4 (byte-to-bits value))))
 
 (defn- bytes-to-int [bytes]
-  (reduce
-    (fn [result b]
-      (bit-or b (bit-shift-left result 8))) 0 bytes))
+  (int
+    (reduce
+      (fn [result b]
+        (bit-or b (bit-shift-left result 8))) 0 bytes)))
 
 (def flag:disabled false)
 (def flag:enabled true)
@@ -41,6 +42,7 @@
 (def r-code:refused (byte-to-4-bits 5))
 (def r-code:reserved (byte-to-4-bits 6))
 (def resource-type:A 1)
+(def resource-type:NS 2)
 (def resource-type:PTR 12)
 (def resource-type:TXT 16)
 (def resource-type:AAAA 28)
@@ -112,17 +114,30 @@
     (case first-byte
       0 path
       -64 (let [next-start (nth message (+ 1 start))]
-             (concat path (decode-q-name next-start message path)))
+            (concat path (decode-q-name next-start message path)))
       (let [name (to-string (byte-array (take first-byte (drop (+ 1 start) message))))
             next-start (+ start 1 first-byte)]
         (decode-q-name next-start message (concat path [name]))))))
 
+(defn- calculate-name-storage [start message]
+  (loop [position start count 0]
+    (let [value (nth message position)]
+      (cond
+        (= 0 value) (+ 1 count)
+        (= -64 value) (+ 2 count)
+        :else (recur (inc position) (inc count))))))
+
+(defn- decode-data [type start length message]
+  (case type
+    resource-type:PTR (decode-q-name start message [])
+    resource-type:NSEC (decode-q-name start message [])
+    resource-type:A (string/join "." (take 4 (drop start message)))
+    (byte-array (take length (drop start message)))))
+
 (defn- decode-sections [position message question-count answer-count]
   (if (> (alength message) position)
     (let [name (decode-q-name position message [])
-          name-indexed (map-indexed (fn [index b] [b index]) (drop position message))
-          path-end (filter (fn [[b index]] (= b 0x00)) name-indexed)
-          name-length (second (first path-end))
+          name-length (calculate-name-storage position message)
           name-end (+ 1 name-length position)
           bytes-after-name (drop name-end message)
           type (bytes-to-int (take 2 bytes-after-name))
@@ -141,11 +156,10 @@
                 ttl (bytes-to-int (take 4 bytes-after-class))
                 bytes-after-ttl (drop 4 bytes-after-class)
                 rd-length (bytes-to-int (take 2 bytes-after-ttl))
-                bytes-after-rd-length (drop 2 bytes-after-ttl)
-                data (byte-array (take rd-length bytes-after-rd-length))
+                data-start (+ name-end 2 2 4 2)
+                data (decode-data type data-start rd-length message)
                 answer {:NAME name :TYPE type :CLASS class :TTL ttl :RDLENGTH rd-length :RDATA data}
-                bytes-after-data (drop rd-length bytes-after-rd-length)
-                next-position (+ name-end 2 2 4 2 rd-length)
+                next-position (+ data-start rd-length)
                 remaining-answer-count (dec answer-count)]
             (concat [answer]
                     (decode-sections next-position message 0 remaining-answer-count)))
