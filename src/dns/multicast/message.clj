@@ -23,10 +23,9 @@
   (boolean-array (take 4 (byte-to-bits value))))
 
 (defn- bytes-to-int [bytes]
-  (int
-    (reduce
+  (reduce
       (fn [result b]
-        (bit-or b (bit-shift-left result 8))) 0 bytes)))
+        (bit-or b (bit-shift-left result 8))) 0 bytes))
 
 (def flag:disabled false)
 (def flag:enabled true)
@@ -108,7 +107,6 @@
      :NSCOUNT (bytes-to-int [ns-count-ms ns-count-ls])
      :ARCOUNT (bytes-to-int [ar-count-ms ar-count-ls])}))
 
-
 (defn- decode-name
   ([start message]
    (decode-name start message []))
@@ -141,7 +139,7 @@
   (if (> (alength message) position)
     (let [name (decode-name position message)
           name-length (name-storage-length position message)
-          name-end (+ 1 name-length position)
+          name-end (+ position name-length)
           bytes-after-name (drop name-end message)
           type (bytes-to-int (take 2 bytes-after-name))
           bytes-after-type (drop 2 bytes-after-name)
@@ -158,12 +156,13 @@
           (let [bytes-after-class (drop 2 bytes-after-type)
                 ttl (bytes-to-int (take 4 bytes-after-class))
                 bytes-after-ttl (drop 4 bytes-after-class)
-                rd-length (bytes-to-int (take 2 bytes-after-ttl))
+                data-length (bytes-to-int (take 2 bytes-after-ttl))
                 data-start (+ name-end 2 2 4 2)
-                data (decode-data type data-start rd-length message)
-                answer {:NAME name :TYPE type :CLASS class :TTL ttl :RDLENGTH rd-length :RDATA data}
-                next-position (+ data-start rd-length)
+                data (decode-data type data-start data-length message)
+                answer {:NAME name :TYPE type :CLASS class :TTL ttl :RDLENGTH data-length :RDATA data}
+                next-position (+ data-start data-length)
                 remaining-answer-count (dec answer-count)]
+
             (concat [answer]
                     (decode-sections next-position message 0 remaining-answer-count)))
           [])))))
