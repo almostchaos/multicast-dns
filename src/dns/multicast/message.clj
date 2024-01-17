@@ -22,10 +22,16 @@
 (defn- byte-to-4-bits [value]
   (boolean-array (take 4 (byte-to-bits value))))
 
-(defn- bytes-to-int [bytes]
+(defn- byte-to-long [b]
+  (Byte/toUnsignedLong b))
+
+(defn- byte-array-to-long [bytes]
   (reduce
     (fn [result b]
       (bit-or b (bit-shift-left result 8))) 0 bytes))
+
+(defn- rand-byte []
+  (byte (- (rand-int 256) 128)))
 
 (def flag:disabled false)
 (def flag:enabled true)
@@ -64,8 +70,8 @@
         rd (:RD header)
         ra (:RA header)]
     (byte-array
-      [(rand-int 255)
-       (rand-int 255)
+      [(rand-byte)
+       (rand-byte)
        (bits-to-byte
          qr (nth qp-code 3) (nth qp-code 2) (nth qp-code 1) (nth qp-code 0) aa tc rd)
        (bits-to-byte
@@ -94,7 +100,7 @@
          qp-code-4 aa tc rd] (byte-to-bits flags-first)
         [ra z1 z2 z3
          r-code-1 r-code-2 r-code-3 r-code-4] (byte-to-bits flags-second)]
-    {:ID      (bytes-to-int [id-ms id-ls])
+    {:ID      (byte-array-to-long [id-ms id-ls])
      :QR      qr
      :OPCODE  (bits-to-byte [qp-code-1 qp-code-2 qp-code-3 qp-code-4])
      :AA      aa
@@ -102,10 +108,10 @@
      :RD      rd
      :RA      ra
      :RCODE   (bits-to-byte [r-code-1 r-code-2 r-code-3 r-code-4])
-     :QDCOUNT (bytes-to-int [qd-count-ms qd-count-ls])
-     :ANCOUNT (bytes-to-int [an-count-ms an-count-ls])
-     :NSCOUNT (bytes-to-int [ns-count-ms ns-count-ls])
-     :ARCOUNT (bytes-to-int [ar-count-ms ar-count-ls])}))
+     :QDCOUNT (byte-array-to-long [qd-count-ms qd-count-ls])
+     :ANCOUNT (byte-array-to-long [an-count-ms an-count-ls])
+     :NSCOUNT (byte-array-to-long [ns-count-ms ns-count-ls])
+     :ARCOUNT (byte-array-to-long [ar-count-ms ar-count-ls])}))
 
 (defn- decode-name
   ([start message]
@@ -116,7 +122,7 @@
        (= 0 first-byte) path
        (>= -64 first-byte) (let [next-start-ms (bit-and 2r00111111 first-byte)
                                  next-start-ls (nth message (inc start))
-                                 next-start (bytes-to-int [next-start-ms next-start-ls])]
+                                 next-start (byte-array-to-long [next-start-ms next-start-ls])]
                              (concat path (decode-name next-start message path)))
        :else (let [label-bytes (take first-byte (drop (inc start) message))
                    label (to-string (byte-array label-bytes))
@@ -144,9 +150,9 @@
           name-length (name-storage-length position message)
           name-end (+ position name-length)
           bytes-after-name (drop name-end message)
-          type (bytes-to-int (take 2 bytes-after-name))
+          type (byte-array-to-long (take 2 bytes-after-name))
           bytes-after-type (drop 2 bytes-after-name)
-          class (bytes-to-int (take 2 bytes-after-type))]
+          class (byte-array-to-long (take 2 bytes-after-type))]
 
       (if (> question-count 0)
         (let [question {:QNAME name :QTYPE type :QCCLASS class}
@@ -157,9 +163,9 @@
 
         (if (> answer-count 0)
           (let [bytes-after-class (drop 2 bytes-after-type)
-                ttl (bytes-to-int (take 4 bytes-after-class))
+                ttl (byte-array-to-long (take 4 bytes-after-class))
                 bytes-after-ttl (drop 4 bytes-after-class)
-                data-length (bytes-to-int (take 2 bytes-after-ttl))
+                data-length (byte-array-to-long (take 2 bytes-after-ttl))
                 data-start (+ name-end 2 2 4 2)
                 data (decode-data type data-start data-length message)
                 answer {:NAME name :TYPE type :CLASS class :TTL ttl :RDLENGTH data-length :RDATA data}
@@ -210,5 +216,5 @@
                      :CD flag:disabled
                      :RCODE r-code:no-error)
       (encode-question service-path
-                       resource-type:PTR
+                       resource-type:A
                        q-class:IN))))
