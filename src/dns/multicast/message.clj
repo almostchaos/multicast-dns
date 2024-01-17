@@ -24,8 +24,8 @@
 
 (defn- bytes-to-int [bytes]
   (reduce
-      (fn [result b]
-        (bit-or b (bit-shift-left result 8))) 0 bytes))
+    (fn [result b]
+      (bit-or b (bit-shift-left result 8))) 0 bytes))
 
 (def flag:disabled false)
 (def flag:enabled true)
@@ -112,13 +112,16 @@
    (decode-name start message []))
   ([start message path]
    (let [first-byte (nth message start)]
-     (case first-byte
-       0 path
-       -64 (let [next-start (nth message (inc start))]
-             (concat path (decode-name next-start message path)))
-       (let [name (to-string (byte-array (take first-byte (drop (inc start) message))))
-             next-start (+ start 1 first-byte)]
-         (decode-name next-start message (concat path [name])))))))
+     (cond
+       (= 0 first-byte) path
+       (>= -64 first-byte) (let [next-start-ms (bit-and 2r00111111 first-byte)
+                                 next-start-ls (nth message (inc start))
+                                 next-start (bytes-to-int [next-start-ms next-start-ls])]
+                             (concat path (decode-name next-start message path)))
+       :else (let [label-bytes (take first-byte (drop (inc start) message))
+                   label (to-string (byte-array label-bytes))
+                   next-start (+ start 1 first-byte)]
+               (decode-name next-start message (concat path [label])))))))
 
 (defn- name-storage-length [start message]
   (loop [position start count 0]
