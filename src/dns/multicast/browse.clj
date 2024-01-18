@@ -3,7 +3,7 @@
     [clojure.core.async :as async :refer [<!! >!! <! >!]]
     [socket.io.udp :refer [socket]]
     [tick.core :as tick]
-    [dns.message :refer [encode-srv-query-message decode-message]]
+    [dns.encoding :refer [encode-srv-query-message decode-message]]
     [clj-commons.byte-streams :refer [to-string print-bytes]]
     [taoensso.timbre :refer [debug info warn error]]))
 
