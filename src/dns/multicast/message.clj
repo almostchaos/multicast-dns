@@ -141,7 +141,7 @@
   (cond
     (= type resource-type:PTR) (decode-name start message)
     (= type resource-type:NSEC) (decode-name start message)
-    (= type resource-type:A) (string/join "." (take 4 (drop start message)))
+    (= type resource-type:A) (string/join "." (map byte-to-long (take 4 (drop start message))))
     :else (byte-array (take length (drop start message)))))
 
 (defn- decode-sections [position message question-count answer-count]
