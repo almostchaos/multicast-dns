@@ -129,7 +129,7 @@
                    next-start (+ start 1 first-byte)]
                (decode-name next-start message (concat path [label])))))))
 
-(defn- name-storage-length [start message]
+(defn- name-storage-size [start message]
   (loop [position start count 0]
     (let [value (nth message position)]
       (cond
@@ -147,7 +147,7 @@
 (defn- decode-sections [position message question-count answer-count]
   (if (> (alength message) position)
     (let [name (decode-name position message)
-          name-length (name-storage-length position message)
+          name-length (name-storage-size position message)
           name-end (+ position name-length)
           bytes-after-name (drop name-end message)
           type (byte-array-to-long (take 2 bytes-after-name))
@@ -181,7 +181,7 @@
         question-count (:QDCOUNT header)
         answer-count (:ANCOUNT header)
         body (decode-sections 12 message question-count answer-count)]
-    {:header header :body body}))
+    (concat [header] body)))
 
 ;specific message creation section
 ;---------------------------------
