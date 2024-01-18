@@ -1,4 +1,4 @@
-(ns dns.multicast.message
+(ns dns.message
   (:require
     [clj-commons.byte-streams :refer [to-byte-array to-string]]
     [clojure.string :as string]))

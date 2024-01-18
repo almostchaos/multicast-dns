@@ -3,14 +3,14 @@
     [clojure.core.async :as async :refer [<!! >!! <! >!]]
     [socket.io.udp :refer [socket]]
     [tick.core :as tick]
-    [dns.multicast.message :refer [encode-srv-query-message]]
+    [dns.message :refer [encode-srv-query-message decode-message]]
     [clj-commons.byte-streams :refer [to-string print-bytes]]
     [taoensso.timbre :refer [debug info warn error]]))
 
 (def mdns-port 5353)
 (def multicast-host "224.0.0.251")
 
-(defn results [messages wait end-callback]
+(defn- results [messages wait end-callback]
   (lazy-seq
     (if (tick/> (tick/instant) wait)
       (let
@@ -35,7 +35,7 @@
     (debug "sent mdns request")
 
     (results received-messages
-             (tick/>> (tick/instant) (tick/new-duration 60 :seconds))
+             (tick/>> (tick/instant) (tick/new-duration 360 :seconds))
              (fn []
                (close)
                (async/close! received-messages)))))
@@ -44,6 +44,10 @@
   (run!
     (fn [[host port message]]
       (println "received [" host ":" port "] ------------")
-      (print-bytes message))
-    (browse "tcp" "spotify-connect"))
+      (print-bytes message)
+      (clojure.pprint/pprint (decode-message message)))
+    (filter
+      (fn [[host _ _]]
+        true)                             ; (not= host "192.168.0.103")
+      (browse "tcp" "smb")))
   (shutdown-agents))
