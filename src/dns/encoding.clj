@@ -3,7 +3,7 @@
     [clj-commons.byte-streams :refer [to-byte-array to-string]]
     [clojure.string :as string]))
 
-(defn- byte-array-concat [& byte-arrays]
+(defn byte-array-concat [& byte-arrays]
   (byte-array (mapcat seq byte-arrays)))
 
 (defn bits-to-byte [& bits]
@@ -60,7 +60,7 @@
 (def q-class:HS 4)
 (def q-class:ANY 255)
 
-(defn- encode-header [& parameters]
+(defn encode-header [& parameters]
   (let [header (apply hash-map parameters)
         qp-code (:OPCODE header)
         r-code (:RCODE header)
@@ -79,7 +79,7 @@
        ;;one question per message is assumed
        0 1 0 0 0 0 0 0])))
 
-(defn- encode-question [path type class]
+(defn encode-question [path type class]
   (byte-array-concat
     (reduce
       (fn [path-bytes name]
@@ -182,39 +182,3 @@
         answer-count (:ANCOUNT header)
         body (decode-sections 12 message question-count answer-count)]
     (concat [header] body)))
-
-;specific message creation section
-;---------------------------------
-(defn encode-srv-query-message [protocol type subtypes]
-  (let [prefix (if (nil? subtypes) [] (conj (map (partial str "_") subtypes) "sub"))
-        path [(str "_" type) (str "_" protocol) "local"]
-        service-path (concat prefix path)]
-    (byte-array-concat
-      (encode-header :QR flag:disabled
-                     :OPCODE op-code:query
-                     :AA flag:disabled
-                     :TC flag:disabled
-                     :RD flag:disabled
-                     :RA flag:disabled
-                     :AD flag:disabled
-                     :CD flag:disabled
-                     :RCODE r-code:no-error)
-      (encode-question service-path
-                       resource-type:PTR
-                       q-class:IN))))
-
-(defn encode-ptr-query-message [name]
-  (let [service-path (string/split name #"\.")]
-    (byte-array-concat
-      (encode-header :QR flag:disabled
-                     :OPCODE op-code:query
-                     :AA flag:disabled
-                     :TC flag:disabled
-                     :RD flag:disabled
-                     :RA flag:disabled
-                     :AD flag:disabled
-                     :CD flag:disabled
-                     :RCODE r-code:no-error)
-      (encode-question service-path
-                       resource-type:A
-                       q-class:IN))))
