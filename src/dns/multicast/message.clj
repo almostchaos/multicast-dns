@@ -28,7 +28,7 @@
 (defn- byte-array-to-long [bytes]
   (reduce
     (fn [result b]
-      (bit-or b (bit-shift-left result 8))) 0 bytes))
+      (bit-or (byte-to-long b) (bit-shift-left result 8))) 0 bytes))
 
 (defn- rand-byte []
   (byte (- (rand-int 256) 128)))
