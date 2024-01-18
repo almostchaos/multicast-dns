@@ -3,9 +3,8 @@
     [clojure.core.async :as async :refer [<!! >!!]]
     [socket.io.udp :refer [socket]]
     [tick.core :as tick]
-    [dns.encoding :refer [decode-message, op-code:inverse-query]]
+    [dns.encoding :refer :all]
     [dns.message :refer [srv-query]]
-    [clj-commons.byte-streams :refer [to-string print-bytes]]
     [taoensso.timbre :refer [debug info warn error]]))
 
 (def mdns-port 5353)
@@ -19,6 +18,9 @@
         (end-callback)
         last-result)
       (cons (<!! messages) (result-sequence messages wait end-callback)))))
+
+(defn- match-ptr [section] (= resource-type:PTR (:TYPE section)))
+(defn- match-a [section] (= resource-type:A (:TYPE section)))
 
 (defn browse [protocol type & subtypes]
   (debug "starting browser ...")
@@ -38,15 +40,24 @@
       (->> (result-sequence messages listen-until (fn []
                                                     (close)
                                                     (async/close! messages)))
-           (map (fn [[host port message]]
-                  [host port (decode-message message)]))
-           (filter (fn [[host port message]]
-                     true))))))
+           (map (fn [[host port message]] (decode-message message)))
+           (filter (fn [message]
+                     (let [header (first message)
+                           body (rest message)
+                           answer-count (:ANCOUNT header)]
+                       (and
+                         (> answer-count 0)
+                         (some match-a body)
+                         (some match-ptr body)))))
+           (map (fn [message]
+                  (let [ptr (first (filter match-ptr message))
+                        a (first (filter match-a message))]
+                    [(:RDATA ptr) (:NAME a) (:RDATA a)])))))))
 
 (defn -main [& args]
   (run!
-    (fn [[host port message]]
-      (println "received [" host ":" port "] ------------")
+    (fn [message]
+      (println "------------")
       (clojure.pprint/pprint message))
     (browse "tcp" "smb"))
   (shutdown-agents))
