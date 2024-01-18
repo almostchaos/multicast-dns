@@ -11,8 +11,8 @@
 (def multicast-host "224.0.0.251")
 
 (defn- resource-type-matcher [type] (fn [section] (= type (:TYPE section))))
-(defn- match-ptr (resource-type-matcher resource-type:PTR))
-(defn- match-a (resource-type-matcher resource-type:A))
+(def match-ptr (resource-type-matcher resource-type:PTR))
+(def match-a (resource-type-matcher resource-type:A))
 
 (defn- result-sequence [messages wait end-callback]
   (lazy-seq
@@ -62,5 +62,5 @@
     (fn [message]
       (println "------------")
       (clojure.pprint/pprint message))
-    (browse "tcp" "airplay"))
+    (browse "tcp" "smb"))
   (shutdown-agents))
