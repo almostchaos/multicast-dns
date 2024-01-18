@@ -10,6 +10,10 @@
 (def mdns-port 5353)
 (def multicast-host "224.0.0.251")
 
+(defn- resource-type-matcher [type] (fn [section] (= type (:TYPE section))))
+(defn- match-ptr (resource-type-matcher resource-type:PTR))
+(defn- match-a (resource-type-matcher resource-type:A))
+
 (defn- result-sequence [messages wait end-callback]
   (lazy-seq
     (if (tick/> (tick/instant) wait)
@@ -19,8 +23,7 @@
         last-result)
       (cons (<!! messages) (result-sequence messages wait end-callback)))))
 
-(defn- match-ptr [section] (= resource-type:PTR (:TYPE section)))
-(defn- match-a [section] (= resource-type:A (:TYPE section)))
+
 
 (defn browse [protocol type & subtypes]
   (debug "starting browser ...")
@@ -52,12 +55,12 @@
            (map (fn [message]
                   (let [ptr (first (filter match-ptr message))
                         a (first (filter match-a message))]
-                    [(:RDATA ptr) (:NAME a) (:RDATA a)])))))))
+                    [(:NAME ptr) (:RDATA ptr) (:NAME a) (:RDATA a)])))))))
 
 (defn -main [& args]
   (run!
     (fn [message]
       (println "------------")
       (clojure.pprint/pprint message))
-    (browse "tcp" "smb"))
+    (browse "tcp" "airplay"))
   (shutdown-agents))
