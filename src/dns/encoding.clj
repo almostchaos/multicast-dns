@@ -48,6 +48,7 @@
 (def r-code:reserved (byte-to-4-bits 6))
 (def resource-type:A 1)
 (def resource-type:NS 2)
+(def resource-type:CNAME 5)
 (def resource-type:PTR 12)
 (def resource-type:TXT 16)
 (def resource-type:AAAA 28)
@@ -117,17 +118,20 @@
   ([start message]
    (decode-name start message []))
   ([start message path]
-   (let [first-byte (nth message start)]
-     (cond
-       (= 0 first-byte) path
-       (>= -64 first-byte) (let [next-start-ms (bit-and 2r00111111 first-byte)
-                                 next-start-ls (nth message (inc start))
-                                 next-start (byte-array-to-long [next-start-ms next-start-ls])]
-                             (concat path (decode-name next-start message path)))
-       :else (let [label-bytes (take first-byte (drop (inc start) message))
-                   label (to-string (byte-array label-bytes))
-                   next-start (+ start 1 first-byte)]
-               (decode-name next-start message (concat path [label])))))))
+   ;;stop if index is outside byte array
+   (if (>= (alength message) start)
+     (let [first-byte (nth message start)]
+       (cond
+         (= 0 first-byte) path
+         (>= -63 first-byte) (let [next-start-ms (bit-and 2r00111111 first-byte)
+                                   next-start-ls (nth message (inc start))
+                                   next-start (byte-array-to-long [next-start-ms next-start-ls])]
+                               (concat path (decode-name next-start message path)))
+         :else (let [label-bytes (take first-byte (drop (inc start) message))
+                     label (to-string (byte-array label-bytes))
+                     next-start (+ start 1 first-byte)]
+                 (decode-name next-start message (concat path [label])))))
+     path)))
 
 (defn- name-storage-size [start message]
   (loop [position start count 0]
@@ -141,7 +145,9 @@
   (cond
     (= type resource-type:PTR) (decode-name start message)
     (= type resource-type:NSEC) (decode-name start message)
+    (= type resource-type:CNAME) (decode-name start message)
     (= type resource-type:A) (string/join "." (map byte-to-long (take 4 (drop start message))))
+    (= type resource-type:TXT) (to-string (byte-array (take length (drop start message))))
     :else (byte-array (take length (drop start message)))))
 
 (defn- decode-sections [position message question-count answer-count]
