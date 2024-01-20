@@ -1,11 +1,10 @@
 (ns dns.multicast.browse
   (:require
     [clojure.core.async :as async :refer [<!! >!!]]
-    [socket.io.udp :refer [socket]]
-    [tick.core :as tick]
     [dns.encoding :refer :all]
     [dns.message :refer [srv-query]]
-    [taoensso.timbre :refer [debug info warn error]]))
+    [socket.io.udp :refer [socket]]
+    [taoensso.timbre :refer [debug]]))
 
 (def mdns-port 5353)
 (def multicast-host "224.0.0.251")
@@ -14,15 +13,14 @@
 (def match-ptr (resource-type-matcher resource-type:PTR))
 (def match-a (resource-type-matcher resource-type:A))
 
-(defn- result-sequence [messages wait end-callback]
+(defn- result-sequence [messages end-callback]
   (lazy-seq
-    (if (tick/> (tick/instant) wait)
-      (let
-        [last-result (cons (<!! messages) nil)]
-        (end-callback)
-        last-result)
-      (cons (<!! messages) (result-sequence messages wait end-callback)))))
-
+    (let [message (<!! messages)]
+      (if (nil? message)
+        (do
+          (end-callback)
+          message)
+        (cons message (result-sequence messages end-callback))))))
 
 
 (defn browse [protocol type & subtypes]
@@ -30,7 +28,7 @@
   (debug "listening for mdns response ...")
 
   (let [message-bytes (srv-query protocol type subtypes)
-        messages (async/chan)
+        messages (async/timeout 120000)
         queue-message (fn [& parameters]
                         (>!! messages parameters))
         {send :send close :close} (socket multicast-host mdns-port queue-message)]
@@ -39,23 +37,18 @@
     (send multicast-host mdns-port message-bytes)
     (debug "sent mdns request")
 
-    (let [listen-until (tick/>> (tick/instant) (tick/new-duration 120 :seconds))]
-      (->> (result-sequence messages listen-until (fn []
-                                                    (close)
-                                                    (async/close! messages)))
-           (map (fn [[host port message]] (decode-message message)))
-           (filter (fn [message]
-                     (let [header (first message)
-                           body (rest message)
-                           answer-count (:ANCOUNT header)]
-                       (and
-                         (> answer-count 0)
-                         (some match-a body)
-                         (some match-ptr body)))))
-           (map (fn [message]
-                  (let [ptr (first (filter match-ptr message))
-                        a (first (filter match-a message))]
-                    [(:NAME ptr) (:RDATA ptr) (:NAME a) (:RDATA a)])))))))
+    (->> (result-sequence messages (fn [] (close) (async/close! messages)))
+         (map (fn [[host port message]] (decode-message message)))
+         (filter (fn [message]
+                   (let [header (first message)
+                         body (rest message)
+                         answer-count (:ANCOUNT header)]
+                     (and
+                       (> answer-count 0)
+                       (some match-ptr body)))))
+         (map (fn [message]
+                (let [ptr (first (filter match-ptr message))]
+                  [(:NAME ptr) (:RDATA ptr)]))))))
 
 (defn -main [& args]
   (run!
