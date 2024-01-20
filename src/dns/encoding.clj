@@ -6,7 +6,7 @@
 (defn byte-array-concat [& byte-arrays]
   (byte-array (mapcat seq byte-arrays)))
 
-(defn bits-to-byte [& bits]
+(defn bits->byte [& bits]
   (byte
     (reduce
       (fn [result [index bit]]
@@ -16,36 +16,36 @@
         (fn [index bit] [index bit])
         (take 8 bits)))))
 
-(defn- byte-to-bits [value]
+(defn- byte->bits [value]
   (boolean-array (reverse (map (partial bit-test value) (range 8)))))
 
-(defn- byte-to-4-bits [value]
-  (boolean-array (take 4 (byte-to-bits value))))
+(defn- byte->4-bits [value]
+  (boolean-array (take 4 (byte->bits value))))
 
-(defn- byte-to-long [b]
+(defn- byte->long [b]
   (Byte/toUnsignedLong b))
 
-(defn- byte-array-to-long [bytes]
+(defn- byte-array->long [bytes]
   (reduce
     (fn [result b]
-      (bit-or (byte-to-long b) (bit-shift-left result 8))) 0 bytes))
+      (bit-or (byte->long b) (bit-shift-left result 8))) 0 bytes))
 
 (defn- rand-byte []
   (byte (- (rand-int 256) 128)))
 
 (def flag:disabled false)
 (def flag:enabled true)
-(def op-code:query (byte-to-4-bits 0))
-(def op-code:inverse-query (byte-to-4-bits 1))
-(def op-code:status (byte-to-4-bits 2))
-(def op-code:reserved (byte-to-4-bits 3))
-(def r-code:no-error (byte-to-4-bits 0))
-(def r-code:format-error (byte-to-4-bits 1))
-(def r-code:server-failure (byte-to-4-bits 2))
-(def r-code:name-error (byte-to-4-bits 3))
-(def r-code:not-implemented (byte-to-4-bits 4))
-(def r-code:refused (byte-to-4-bits 5))
-(def r-code:reserved (byte-to-4-bits 6))
+(def op-code:query (byte->4-bits 0))
+(def op-code:inverse-query (byte->4-bits 1))
+(def op-code:status (byte->4-bits 2))
+(def op-code:reserved (byte->4-bits 3))
+(def r-code:no-error (byte->4-bits 0))
+(def r-code:format-error (byte->4-bits 1))
+(def r-code:server-failure (byte->4-bits 2))
+(def r-code:name-error (byte->4-bits 3))
+(def r-code:not-implemented (byte->4-bits 4))
+(def r-code:refused (byte->4-bits 5))
+(def r-code:reserved (byte->4-bits 6))
 (def type:A 1)
 (def type:NS 2)
 (def type:CNAME 5)
@@ -69,9 +69,9 @@
     (byte-array
       [(rand-byte)
        (rand-byte)
-       (bits-to-byte
+       (bits->byte
          qr (nth qp-code 3) (nth qp-code 2) (nth qp-code 1) (nth qp-code 0) aa tc rd)
-       (bits-to-byte
+       (bits->byte
          ra false false false (nth r-code 3) (nth r-code 2) (nth r-code 1) (nth r-code 0))
        ;;one question per message is assumed
        0 1 0 0 0 0 0 0])))
@@ -94,21 +94,21 @@
          ns-count-ms ns-count-ls
          ar-count-ms ar-count-ls] header-bytes
         [qr qp-code-1 qp-code-2 qp-code-3
-         qp-code-4 aa tc rd] (byte-to-bits flags-first)
+         qp-code-4 aa tc rd] (byte->bits flags-first)
         [ra z1 z2 z3
-         r-code-1 r-code-2 r-code-3 r-code-4] (byte-to-bits flags-second)]
-    {:ID      (byte-array-to-long [id-ms id-ls])
+         r-code-1 r-code-2 r-code-3 r-code-4] (byte->bits flags-second)]
+    {:ID      (byte-array->long [id-ms id-ls])
      :QR      qr
-     :OPCODE  (bits-to-byte [qp-code-1 qp-code-2 qp-code-3 qp-code-4])
+     :OPCODE  (bits->byte [qp-code-1 qp-code-2 qp-code-3 qp-code-4])
      :AA      aa
      :TC      tc
      :RD      rd
      :RA      ra
-     :RCODE   (bits-to-byte [r-code-1 r-code-2 r-code-3 r-code-4])
-     :QDCOUNT (byte-array-to-long [qd-count-ms qd-count-ls])
-     :ANCOUNT (byte-array-to-long [an-count-ms an-count-ls])
-     :NSCOUNT (byte-array-to-long [ns-count-ms ns-count-ls])
-     :ARCOUNT (byte-array-to-long [ar-count-ms ar-count-ls])}))
+     :RCODE   (bits->byte [r-code-1 r-code-2 r-code-3 r-code-4])
+     :QDCOUNT (byte-array->long [qd-count-ms qd-count-ls])
+     :ANCOUNT (byte-array->long [an-count-ms an-count-ls])
+     :NSCOUNT (byte-array->long [ns-count-ms ns-count-ls])
+     :ARCOUNT (byte-array->long [ar-count-ms ar-count-ls])}))
 
 (defn- decode-name
   ([start message]
@@ -121,7 +121,7 @@
          (= 0 first-byte) (string/join "." path)
          (>= -63 first-byte) (let [next-start-ms (bit-and 2r00111111 first-byte)
                                    next-start-ls (nth message (inc start))
-                                   next-start (byte-array-to-long [next-start-ms next-start-ls])]
+                                   next-start (byte-array->long [next-start-ms next-start-ls])]
                                (decode-name next-start message path))
          :else (let [label-bytes (take first-byte (drop (inc start) message))
                      label (to-string (byte-array label-bytes))
@@ -142,7 +142,7 @@
     (= type type:PTR) (decode-name start message)
     (= type type:NSEC) (decode-name start message)
     (= type type:CNAME) (decode-name start message)
-    (= type type:A) (string/join "." (map byte-to-long (take 4 (drop start message))))
+    (= type type:A) (string/join "." (map byte->long (take 4 (drop start message))))
     (= type type:TXT) (to-string (byte-array (take length (drop start message))))
     :else (byte-array (take length (drop start message)))))
 
@@ -152,9 +152,9 @@
           name-length (name-storage-size position message)
           name-end (+ position name-length)
           bytes-after-name (drop name-end message)
-          type (byte-array-to-long (take 2 bytes-after-name))
+          type (byte-array->long (take 2 bytes-after-name))
           bytes-after-type (drop 2 bytes-after-name)
-          class (byte-array-to-long (take 2 bytes-after-type))]
+          class (byte-array->long (take 2 bytes-after-type))]
 
       (if (> question-count 0)
         (let [question {:QNAME name :QTYPE type :QCCLASS class}
@@ -165,9 +165,9 @@
 
         (if (> answer-count 0)
           (let [bytes-after-class (drop 2 bytes-after-type)
-                ttl (byte-array-to-long (take 4 bytes-after-class))
+                ttl (byte-array->long (take 4 bytes-after-class))
                 bytes-after-ttl (drop 4 bytes-after-class)
-                data-length (byte-array-to-long (take 2 bytes-after-ttl))
+                data-length (byte-array->long (take 2 bytes-after-ttl))
                 data-start (+ name-end 2 2 4 2)
                 data (decode-data type data-start data-length message)
                 answer {:NAME name :TYPE type :CLASS class :TTL ttl :RDLENGTH data-length :RDATA data}
