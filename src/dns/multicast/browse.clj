@@ -1,5 +1,6 @@
 (ns dns.multicast.browse
   (:require
+    [clj-commons.byte-streams :refer [to-string print-bytes]]
     [clojure.core.async :as async :refer [<!! >!!]]
     [clojure.string :as string]
     [dns.encoding :refer :all]
@@ -39,7 +40,7 @@
     (send multicast-host mdns-port message-bytes)
     (debug "sent mdns request")
 
-    (->> (result-sequence messages (fn [] (close) (async/close! messages)))
+    (->> (result-sequence messages close)
          (map (fn [[host port message]] (decode-message message)))
          (filter (fn [message]
                    (let [header (first message)
@@ -48,17 +49,17 @@
                      (and
                        (> answer-count 0)
                        (some match-ptr body)
-                       (=
-                         (string/split service-path  #"\.")
-                         (-> (filter match-ptr message) first :NAME))))))
+                       (= service-path (-> (filter match-ptr message) first :NAME))))))
          (map (fn [message]
-                (let [ptr (first (filter match-ptr message))]
-                  [(:NAME ptr) (:RDATA ptr)]))))))
+                (let [ptr (first (filter match-ptr message))
+                      a (first (filter match-a message))
+                      result [(:NAME ptr) (:RDATA ptr)]]
+                  (if (nil? a) result (conj result (:NAME a)))))))))
 
 (defn -main [& args]
   (run!
     (fn [message]
       (println "------------")
       (clojure.pprint/pprint message))
-    (browse "_airplay._tcp.local"))
+    (browse "_smb._tcp.local"))
   (shutdown-agents))
