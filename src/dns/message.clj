@@ -15,8 +15,8 @@
                    :CD flag:disabled
                    :RCODE r-code:no-error)
     (encode-question (string/split service-path #"\.")
-                     resource-type:PTR
-                     q-class:IN)))
+                     type:PTR
+                     class:IN)))
 
 (defn a-query [name]
   (let [service-path (string/split name #"\.")]
@@ -31,5 +31,5 @@
                      :CD flag:disabled
                      :RCODE r-code:no-error)
       (encode-question service-path
-                       resource-type:A
-                       q-class:IN))))
+                       type:A
+                       class:IN))))

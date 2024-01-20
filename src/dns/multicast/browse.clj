@@ -12,9 +12,9 @@
 (def multicast-host "224.0.0.251")
 
 (defn- resource-type-matcher [type] (fn [section] (= type (:TYPE section))))
-(def match-ptr (resource-type-matcher resource-type:PTR))
-(def match-srv (resource-type-matcher resource-type:SRV))
-(def match-a (resource-type-matcher resource-type:A))
+(def match-ptr (resource-type-matcher type:PTR))
+(def match-srv (resource-type-matcher type:SRV))
+(def match-a (resource-type-matcher type:A))
 
 (defn- result-sequence [messages end-callback]
   (lazy-seq

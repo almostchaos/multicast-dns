@@ -46,20 +46,16 @@
 (def r-code:not-implemented (byte-to-4-bits 4))
 (def r-code:refused (byte-to-4-bits 5))
 (def r-code:reserved (byte-to-4-bits 6))
-(def resource-type:A 1)
-(def resource-type:NS 2)
-(def resource-type:CNAME 5)
-(def resource-type:PTR 12)
-(def resource-type:TXT 16)
-(def resource-type:AAAA 28)
-(def resource-type:SRV 33)
-(def resource-type:NSEC 47)
-(def resource-type:ANY 255)
-(def q-class:IN 1)
-(def q-class:CS 2)
-(def q-class:CH 3)
-(def q-class:HS 4)
-(def q-class:ANY 255)
+(def type:A 1)
+(def type:NS 2)
+(def type:CNAME 5)
+(def type:PTR 12)
+(def type:TXT 16)
+(def type:AAAA 28)
+(def type:SRV 33)
+(def type:NSEC 47)
+(def type:ANY 255)
+(def class:IN 1)
 
 (defn encode-header [& parameters]
   (let [header (apply hash-map parameters)
@@ -143,11 +139,11 @@
 
 (defn- decode-data [type start length message]
   (cond
-    (= type resource-type:PTR) (decode-name start message)
-    (= type resource-type:NSEC) (decode-name start message)
-    (= type resource-type:CNAME) (decode-name start message)
-    (= type resource-type:A) (string/join "." (map byte-to-long (take 4 (drop start message))))
-    (= type resource-type:TXT) (to-string (byte-array (take length (drop start message))))
+    (= type type:PTR) (decode-name start message)
+    (= type type:NSEC) (decode-name start message)
+    (= type type:CNAME) (decode-name start message)
+    (= type type:A) (string/join "." (map byte-to-long (take 4 (drop start message))))
+    (= type type:TXT) (to-string (byte-array (take length (drop start message))))
     :else (byte-array (take length (drop start message)))))
 
 (defn- decode-sections [position message question-count answer-count]
