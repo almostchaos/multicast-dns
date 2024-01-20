@@ -126,7 +126,7 @@
          (>= -63 first-byte) (let [next-start-ms (bit-and 2r00111111 first-byte)
                                    next-start-ls (nth message (inc start))
                                    next-start (byte-array-to-long [next-start-ms next-start-ls])]
-                               (concat path (decode-name next-start message path)))
+                               (decode-name next-start message path))
          :else (let [label-bytes (take first-byte (drop (inc start) message))
                      label (to-string (byte-array label-bytes))
                      next-start (+ start 1 first-byte)]
