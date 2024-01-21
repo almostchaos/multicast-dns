@@ -7,7 +7,7 @@
     [taoensso.timbre :refer [debug]]))
 
 (def mdns-port 53)
-(def multicast-host "193.231.252.1")
+(def multicast-host "8.8.8.8")
 
 (defn query
   [name]
@@ -17,7 +17,8 @@
   (let [message-bytes (time (a-query name))
         messages (async/timeout 500)
         {send :send close :close}
-        (socket "0.0.0.0" 10001 (fn [& parameters] (>!! messages parameters)))]
+        ;;use all network interfaces and pick a random port
+        (socket "0.0.0.0" 0 (fn [& parameters] (>!! messages parameters)))]
 
     (debug "sending mdns request")
     (send multicast-host mdns-port message-bytes)
@@ -29,7 +30,7 @@
 
 
 (defn -main [& args]
-  (let [[host port message] (query "mail.yahoo.com")]
+  (let [[host port message] (time (query "wikipedia.org"))]
     (println "received [" host ":" port "] ------------")
     (clojure.pprint/pprint (decode-message message)))
 
