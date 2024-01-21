@@ -9,15 +9,6 @@
 (def mdns-port 53)
 (def multicast-host "193.231.252.1")
 
-(defn- result-sequence [messages end-callback]
-  (lazy-seq
-    (let [message (<!! messages)]
-      (if (nil? message)
-        (do
-          (end-callback)
-          message)
-        (cons message (result-sequence messages end-callback))))))
-
 (defn query
   [name]
   (debug "starting browser ...")
@@ -32,13 +23,14 @@
     (send multicast-host mdns-port message-bytes)
     (debug "sent mdns request")
 
-    (result-sequence messages close)))
+    (let [result (<!! messages)]
+      (close)
+      result)))
 
 
 (defn -main [& args]
-  (run!
-    (fn [[host port message]]
-      (println "received [" host ":" port "] ------------")
-      (clojure.pprint/pprint (decode-message message)))
-    (query "mail.yahoo.com"))
+  (let [[host port message] (query "mail.yahoo.com")]
+    (println "received [" host ":" port "] ------------")
+    (clojure.pprint/pprint (decode-message message)))
+
   (shutdown-agents))
