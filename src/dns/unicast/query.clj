@@ -10,7 +10,7 @@
   (debug "starting client ...")
   (debug "listening for dns response ...")
 
-  (let [message-bytes (time (a-query name))
+  (let [message-bytes (a-query name)
         messages (async/timeout 500)
         {send :send close-socket :close}
         ;;use all network interfaces and pick a random port
@@ -20,14 +20,18 @@
     (send dns 53 message-bytes)
     (debug "sent dns request")
 
-    (let [result (<!! messages)]
+    (let [[host port message] (<!! messages)]
       (close-socket)
-      result)))
+      (->
+        (->>
+          (decode-message message)
+          (filter
+            (fn [section] (= type:A (:TYPE section)))))
+        (first)
+        (:RDATA)))))
 
 
 (defn -main [& args]
-  (let [[host port message] (time (name->ip "8.8.8.8" "wikipedia.org"))]
-    (println "received [" host ":" port "] ------------")
-    (clojure.pprint/pprint (decode-message message)))
+  (println (name->ip "8.8.8.8" "wikipedia.org"))
 
   (shutdown-agents))

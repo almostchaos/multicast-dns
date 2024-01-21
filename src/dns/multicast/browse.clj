@@ -37,24 +37,26 @@
     (send multicast-host mdns-port message-bytes)
     (debug "sent mdns request")
 
-    (->>
-      (result-sequence messages close)
-      (map
-        (fn [[host port message]]
-          (decode-message message)))
-      (filter
-        (fn [message]
-          (let [header (first message)
-                body (rest message)
-                answer-count (:ANCOUNT header)]
-            (and
-              (> answer-count 0)
-              (some match-a body)
-              (= name (-> (filter match-a message) first :NAME))))))
-      (map
-        (fn [message]
-          (async/close! messages)
-          (-> (filter match-a message) first :RDATA)))
+    (->
+      (->>
+        (result-sequence messages close)
+        (map
+          (fn [[host port message]]
+            (decode-message message)))
+        (filter
+          (fn [message]
+            (let [header (first message)
+                  body (rest message)
+                  answer-count (:ANCOUNT header)]
+              (and
+                (> answer-count 0)
+                (some match-a body)
+                (= name (-> (filter match-a message) first :NAME))))))
+        (map
+          (fn [message]
+            ;close channel as soon as first match is acquired
+            (async/close! messages)
+            (-> (filter match-a message) first :RDATA))))
       (to-array)
       (first))))
 
