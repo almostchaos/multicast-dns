@@ -1,10 +1,8 @@
 (ns dns.multicast.browse
   (:require
-    [clj-commons.byte-streams :refer [to-string print-bytes]]
     [clojure.core.async :as async :refer [<!! >!!]]
-    [clojure.string :as string]
     [dns.encoding :refer :all]
-    [dns.message :refer [srv-query a-query]]
+    [dns.message :refer [a-query srv-query]]
     [socket.io.udp :refer [socket]]
     [taoensso.timbre :refer [debug]]))
 
@@ -29,8 +27,8 @@
   (debug "starting client ...")
   (debug "listening for dns response ...")
 
-  (let [message-bytes (time (a-query name))
-        messages (async/timeout 2000)
+  (let [message-bytes (a-query name)
+        messages (async/timeout 5000)
         queue-message (fn [& parameters]
                         (>!! messages parameters))
         {send :send close :close} (socket multicast-host mdns-port queue-message)]
@@ -39,28 +37,33 @@
     (send multicast-host mdns-port message-bytes)
     (debug "sent mdns request")
 
-    (->> (result-sequence messages close)
-         (map (fn [[host port message]] (decode-message message)))
-         (filter (fn [message]
-                   (let [header (first message)
-                         body (rest message)
-                         answer-count (:ANCOUNT header)]
-                     (and
-                       (> answer-count 0)
-                       (some match-a body)
-                       (= name (-> (filter match-a message) first :NAME))))))
-         (map (fn [message]
-                (let [a (first (filter match-a message))]
-                  (:RDATA a))))
-         first)))
-
+    (->>
+      (result-sequence messages close)
+      (map
+        (fn [[host port message]]
+          (decode-message message)))
+      (filter
+        (fn [message]
+          (let [header (first message)
+                body (rest message)
+                answer-count (:ANCOUNT header)]
+            (and
+              (> answer-count 0)
+              (some match-a body)
+              (= name (-> (filter match-a message) first :NAME))))))
+      (map
+        (fn [message]
+          (async/close! messages)
+          (-> (filter match-a message) first :RDATA)))
+      (to-array)
+      (first))))
 
 (defn services-of-type [service-path]
   (debug "starting browser ...")
   (debug "listening for mdns response ...")
 
   (let [message-bytes (srv-query service-path)
-        messages (async/timeout 20000)
+        messages (async/timeout 10000)
         queue-message (fn [& parameters]
                         (>!! messages parameters))
         {send :send close :close} (socket multicast-host mdns-port queue-message)]
@@ -69,26 +72,27 @@
     (send multicast-host mdns-port message-bytes)
     (debug "sent mdns request")
 
-    (->> (result-sequence messages close)
-         (map (fn [[host port message]] (decode-message message)))
-         (filter (fn [message]
-                   (let [header (first message)
-                         body (rest message)
-                         answer-count (:ANCOUNT header)]
-                     (and
-                       (> answer-count 0)
-                       (some match-a body)
-                       (some match-ptr body)
-                       (= service-path (-> (filter match-ptr message) first :NAME))))))
-         (map (fn [message]
-                (let [a (first (filter match-a message))]
-                      (:NAME a)))))))
+    (->>
+      (result-sequence messages close)
+      (map
+        (fn [[host port message]] (decode-message message)))
+      (filter
+        (fn [message]
+          (let [header (first message)
+                body (rest message)
+                answer-count (:ANCOUNT header)]
+            (and
+              (> answer-count 0)
+              (some match-a body)
+              (some match-ptr body)
+              (= service-path (-> (filter match-ptr message) first :NAME))))))
+      (map
+        (fn [message]
+          (let [a (first (filter match-a message))]
+            (:NAME a)))))))
 
 (defn -main [& args]
-  (println (name->ip "octopi.local"))
-  (run!
-    (fn [message]
-      (println "------------")
-      (clojure.pprint/pprint message))
-    (services-of-type "_smb._tcp.local"))
+  (run! println (services-of-type "_smb._tcp.local"))
+  ;;(println (name->ip "octopi.local"))
+
   (shutdown-agents))
