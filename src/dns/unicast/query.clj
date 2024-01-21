@@ -6,13 +6,10 @@
     [socket.io.udp :refer [socket]]
     [taoensso.timbre :refer [debug]]))
 
-(def mdns-port 53)
-(def multicast-host "8.8.8.8")
-
 (defn query
   [name]
-  (debug "starting browser ...")
-  (debug "listening for mdns response ...")
+  (debug "starting client ...")
+  (debug "listening for dns response ...")
 
   (let [message-bytes (time (a-query name))
         messages (async/timeout 500)
@@ -20,9 +17,9 @@
         ;;use all network interfaces and pick a random port
         (socket "0.0.0.0" 0 (fn [& parameters] (>!! messages parameters)))]
 
-    (debug "sending mdns request")
-    (send multicast-host mdns-port message-bytes)
-    (debug "sent mdns request")
+    (debug "sending dns request")
+    (send "8.8.8.8" 53 message-bytes)
+    (debug "sent dns request")
 
     (let [result (<!! messages)]
       (close)
