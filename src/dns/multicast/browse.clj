@@ -61,5 +61,5 @@
     (fn [message]
       (println "------------")
       (clojure.pprint/pprint message))
-    (browse "_smb._tcp.local"))
+    (browse "_airplay._tcp.local"))
   (shutdown-agents))
