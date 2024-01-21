@@ -4,7 +4,7 @@
     [clojure.core.async :as async :refer [<!! >!!]]
     [clojure.string :as string]
     [dns.encoding :refer :all]
-    [dns.message :refer [srv-query]]
+    [dns.message :refer [srv-query a-query]]
     [socket.io.udp :refer [socket]]
     [taoensso.timbre :refer [debug]]))
 
@@ -25,8 +25,37 @@
           message)
         (cons message (result-sequence messages end-callback))))))
 
+(defn name->ip [name]
+  (debug "starting client ...")
+  (debug "listening for dns response ...")
 
-(defn browse [service-path]
+  (let [message-bytes (time (a-query name))
+        messages (async/timeout 2000)
+        queue-message (fn [& parameters]
+                        (>!! messages parameters))
+        {send :send close :close} (socket multicast-host mdns-port queue-message)]
+
+    (debug "sending mdns request")
+    (send multicast-host mdns-port message-bytes)
+    (debug "sent mdns request")
+
+    (->> (result-sequence messages close)
+         (map (fn [[host port message]] (decode-message message)))
+         (filter (fn [message]
+                   (let [header (first message)
+                         body (rest message)
+                         answer-count (:ANCOUNT header)]
+                     (and
+                       (> answer-count 0)
+                       (some match-a body)
+                       (= name (-> (filter match-a message) first :NAME))))))
+         (map (fn [message]
+                (let [a (first (filter match-a message))]
+                  (:RDATA a))))
+         first)))
+
+
+(defn services-of-type [service-path]
   (debug "starting browser ...")
   (debug "listening for mdns response ...")
 
@@ -48,18 +77,18 @@
                          answer-count (:ANCOUNT header)]
                      (and
                        (> answer-count 0)
+                       (some match-a body)
                        (some match-ptr body)
                        (= service-path (-> (filter match-ptr message) first :NAME))))))
          (map (fn [message]
-                (let [ptr (first (filter match-ptr message))
-                      a (first (filter match-a message))
-                      result [(:NAME ptr) (:RDATA ptr)]]
-                  (if (nil? a) result (conj result (:NAME a)))))))))
+                (let [a (first (filter match-a message))]
+                      (:NAME a)))))))
 
 (defn -main [& args]
+  (println (name->ip "octopi.local"))
   (run!
     (fn [message]
       (println "------------")
       (clojure.pprint/pprint message))
-    (browse "_airplay._tcp.local"))
+    (services-of-type "_smb._tcp.local"))
   (shutdown-agents))
