@@ -184,5 +184,6 @@
   (let [header (decode-header (take 12 message))
         question-count (:QDCOUNT header)
         answer-count (:ANCOUNT header)
-        body (decode-sections 12 message question-count answer-count)]
+        additional-record-count (:ARCOUNT header)
+        body (decode-sections 12 message question-count (+ additional-record-count answer-count))]
     (concat [header] body)))
