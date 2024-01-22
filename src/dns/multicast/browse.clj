@@ -90,10 +90,10 @@
               (= service-path (-> (filter match-ptr message) (first) (:NAME)))))))
       (map
         (fn [message]
-          (-> (filter match-ptr message) (first) (:NAME)))))))
+          (-> (filter match-a message) (first) (:NAME)))))))
 
 (defn -main [& args]
-  (run! println (services-of-type "_smb._tcp.local"))
+  (run! println (services-of-type "_hap._tcp.local"))
   ;;(println (name->ip "octopi.local"))
 
   (shutdown-agents))
