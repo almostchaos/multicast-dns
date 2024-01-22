@@ -60,7 +60,7 @@
       (to-array)
       (first))))
 
-(defn services-of-type [service-path]
+(defn service->names [service-path]
   (debug "starting browser ...")
   (debug "listening for mdns response ...")
 
@@ -91,7 +91,7 @@
             (-> (filter match-a message) (first) (:NAME))))))))
 
 (defn -main [& args]
-  (run! println (services-of-type "_googlecast._tcp.local"))
+  (run! println (service->names "_octoprint._tcp.local"))
   ;;(println (name->ip "octopi.local"))
 
   (shutdown-agents))
