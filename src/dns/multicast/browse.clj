@@ -51,7 +51,7 @@
               (and
                 (> answer-count 0)
                 (some match-a body)
-                (= name (-> (filter match-a message) first :NAME))))))
+                (= name (-> (filter match-a message) (first) (:NAME)))))))
         (map
           (fn [message]
             ;close channel as soon as first match is acquired
@@ -87,11 +87,10 @@
               (> answer-count 0)
               (some match-a body)
               (some match-ptr body)
-              (= service-path (-> (filter match-ptr message) first :NAME))))))
+              (= service-path (-> (filter match-ptr message) (first) (:NAME)))))))
       (map
         (fn [message]
-          (let [a (first (filter match-a message))]
-            (:NAME a)))))))
+          (-> (filter match-ptr message) (first) (:NAME)))))))
 
 (defn -main [& args]
   (run! println (services-of-type "_smb._tcp.local"))
