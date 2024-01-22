@@ -45,10 +45,7 @@
             (decode-message message)))
         (filter
           (fn [message]
-            (let [body (rest message)]
-              (and
-                (some match-a body)
-                (= name (-> (filter match-a message) (first) (:NAME)))))))
+            (= name (-> (filter match-a message) (first) (:NAME)))))
         (map
           (fn [message]
             ;close channel as soon as first match is acquired
@@ -78,17 +75,15 @@
           (fn [[host port message]] (decode-message message)))
         (filter
           (fn [message]
-            (let [body (rest message)]
-              (and
-                (some match-a body)
-                (some match-ptr body)
-                (= service-path (-> (filter match-ptr message) (first) (:NAME)))))))
+            (and
+                (some match-a message)
+                (= service-path (-> (filter match-ptr message) (first) (:NAME))))))
         (map
           (fn [message]
             (-> (filter match-a message) (first) (:NAME))))))))
 
 (defn -main [& args]
-  (run! println (service->names "_octoprint._tcp.local"))
-  ;;(println (name->ip "octopi.local"))
+  ;;(run! println (service->names "_octoprint._tcp.local"))
+  (println (name->ip "octopi.local"))
 
   (shutdown-agents))
