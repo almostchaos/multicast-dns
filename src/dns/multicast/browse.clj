@@ -81,11 +81,8 @@
           (fn [[host port message]] (decode-message message)))
         (filter
           (fn [message]
-            (let [header (first message)
-                  body (rest message)
-                  answer-count (:ANCOUNT header)]
+            (let [body (rest message)]
               (and
-                (> answer-count 0)
                 (some match-a body)
                 (some match-ptr body)
                 (= service-path (-> (filter match-ptr message) (first) (:NAME)))))))
@@ -94,7 +91,7 @@
             (-> (filter match-a message) (first) (:NAME))))))))
 
 (defn -main [& args]
-  (run! println (services-of-type "_hap._tcp.local"))
+  (run! println (services-of-type "_googlecast._tcp.local"))
   ;;(println (name->ip "octopi.local"))
 
   (shutdown-agents))
