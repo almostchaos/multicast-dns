@@ -119,7 +119,7 @@
      (let [first-byte (nth message start)]
        (cond
          (= 0 first-byte) (string/join "." path)
-         (>= -63 first-byte) (let [next-start-ms (bit-and 2r00111111 first-byte)
+         (>= -64 first-byte) (let [next-start-ms (bit-and 2r00111111 first-byte)
                                    next-start-ls (nth message (inc start))
                                    next-start (byte-array->long [next-start-ms next-start-ls])]
                                (decode-name next-start message path))
