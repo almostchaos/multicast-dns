@@ -45,11 +45,8 @@
             (decode-message message)))
         (filter
           (fn [message]
-            (let [header (first message)
-                  body (rest message)
-                  answer-count (:ANCOUNT header)]
+            (let [body (rest message)]
               (and
-                (> answer-count 0)
                 (some match-a body)
                 (= name (-> (filter match-a message) (first) (:NAME)))))))
         (map
