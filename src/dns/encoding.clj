@@ -118,26 +118,30 @@
    (if (> (alength message) start)
      (let [first-byte (nth message start)]
        (cond
-         (= 0 first-byte) (string/join "." path)
-         (>= -64 first-byte) (let [next-start-ms (bit-and 2r00111111 first-byte)
-                                   next-start-ls (nth message (inc start))
-                                   next-start (byte-array->long [next-start-ms next-start-ls])]
-                               (decode-name next-start message path))
-         :else (let [label-bytes (take first-byte (drop (inc start) message))
-                     label (to-string (byte-array label-bytes))
-                     next-start (+ start 1 first-byte)]
-                 (decode-name next-start message (concat path [label])))))
+         (= 0 first-byte)
+         (string/join "." path)
+         (= 2r11000000 (bit-and 2r11000000 first-byte))
+         (let [next-start-ms (bit-and 2r00111111 first-byte)
+               next-start-ls (nth message (inc start))
+               next-start (byte-array->long [next-start-ms next-start-ls])]
+           (decode-name next-start message path))
+         :else
+         (let [label-length (byte->long first-byte)
+               label-bytes (take label-length (drop (inc start) message))
+               label (to-string (byte-array label-bytes))
+               next-start (+ start 1 label-length)]
+           (decode-name next-start message (concat path [label])))))
      path)))
 
 (defn- name-storage-size [start message]
-  (loop [position start count 0]
-    (if (> (alength message) start)
+  (if (> (alength message) start)
+    (loop [position start count 0]
       (let [value (nth message position)]
         (cond
           (= 0 value) (+ 1 count)
-          (= -64 value) (+ 2 count)
-          :else (recur (inc position) (inc count))))
-      count)))
+          (= 2r11000000 (bit-and 2r11000000 value)) (+ 2 count)
+          :else (recur (inc position) (inc count)))))
+    0))
 
 (defn- decode-data [type start length message]
   (cond
