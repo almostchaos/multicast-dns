@@ -76,8 +76,8 @@
         (filter
           (fn [message]
             (and
-                (some match-a message)
-                (= service-path (-> (filter match-ptr message) (first) (:NAME))))))
+              (some match-a message)
+              (= service-path (-> (filter match-ptr message) (first) (:NAME))))))
         (map
           (fn [message]
             (-> (filter match-a message) (first) (:NAME))))))))
