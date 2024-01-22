@@ -3,7 +3,7 @@
     [clojure.string :as string]
     [dns.encoding :refer :all]))
 
-(defn srv-query [service-path]
+(defn ptr-query [service-path]
   (byte-array-concat
     (encode-header :QR flag:disabled
                    :OPCODE op-code:query

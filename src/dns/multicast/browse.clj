@@ -2,7 +2,7 @@
   (:require
     [clojure.core.async :as async :refer [<!! >!!]]
     [dns.encoding :refer :all]
-    [dns.message :refer [a-query srv-query]]
+    [dns.message :refer [a-query ptr-query]]
     [socket.io.udp :refer [socket]]
     [taoensso.timbre :refer [debug]]))
 
@@ -58,7 +58,7 @@
   (debug "starting browser ...")
   (debug "listening for mdns response ...")
 
-  (let [message-bytes (srv-query service-path)
+  (let [message-bytes (ptr-query service-path)
         messages (async/timeout 10000)
         queue-message (fn [& parameters]
                         (>!! messages parameters))
