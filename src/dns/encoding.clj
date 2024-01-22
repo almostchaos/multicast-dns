@@ -114,8 +114,8 @@
   ([start message]
    (decode-name start message []))
   ([start message path]
-   ;;stop if index is outside byte array
-   (if (>= (alength message) start)
+   ;;stop if index is out of bounds
+   (if (> (alength message) start)
      (let [first-byte (nth message start)]
        (cond
          (= 0 first-byte) (string/join "." path)
@@ -131,11 +131,12 @@
 
 (defn- name-storage-size [start message]
   (loop [position start count 0]
-    (let [value (nth message position)]
-      (cond
-        (= 0 value) (+ 1 count)
-        (= -64 value) (+ 2 count)
-        :else (recur (inc position) (inc count))))))
+    (if (> (alength message) start)
+      (let [value (nth message position)]
+        (cond
+          (= 0 value) (+ 1 count)
+          (= -64 value) (+ 2 count)
+          :else (recur (inc position) (inc count)))))))
 
 (defn- decode-data [type start length message]
   (cond
