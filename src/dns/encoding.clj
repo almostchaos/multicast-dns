@@ -136,7 +136,8 @@
         (cond
           (= 0 value) (+ 1 count)
           (= -64 value) (+ 2 count)
-          :else (recur (inc position) (inc count)))))))
+          :else (recur (inc position) (inc count))))
+      count)))
 
 (defn- decode-data [type start length message]
   (cond
