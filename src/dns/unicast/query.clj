@@ -26,7 +26,8 @@
         (->>
           (decode-message message)
           (filter
-            (fn [section] (= type:A (:TYPE section)))))
+            (fn [section]
+              (= type:A (:TYPE section)))))
         (first)
         (:RDATA)))))
 
