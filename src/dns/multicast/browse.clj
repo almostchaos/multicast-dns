@@ -74,23 +74,24 @@
     (send multicast-host mdns-port message-bytes)
     (debug "sent mdns request")
 
-    (->>
-      (result-sequence messages close)
-      (map
-        (fn [[host port message]] (decode-message message)))
-      (filter
-        (fn [message]
-          (let [header (first message)
-                body (rest message)
-                answer-count (:ANCOUNT header)]
-            (and
-              (> answer-count 0)
-              (some match-a body)
-              (some match-ptr body)
-              (= service-path (-> (filter match-ptr message) (first) (:NAME)))))))
-      (map
-        (fn [message]
-          (-> (filter match-a message) (first) (:NAME)))))))
+    (set
+      (->>
+        (result-sequence messages close)
+        (map
+          (fn [[host port message]] (decode-message message)))
+        (filter
+          (fn [message]
+            (let [header (first message)
+                  body (rest message)
+                  answer-count (:ANCOUNT header)]
+              (and
+                (> answer-count 0)
+                (some match-a body)
+                (some match-ptr body)
+                (= service-path (-> (filter match-ptr message) (first) (:NAME)))))))
+        (map
+          (fn [message]
+            (-> (filter match-a message) (first) (:NAME))))))))
 
 (defn -main [& args]
   (run! println (services-of-type "_hap._tcp.local"))
