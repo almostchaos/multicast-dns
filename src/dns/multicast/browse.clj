@@ -24,19 +24,13 @@
         (cons message (result-sequence messages end-callback))))))
 
 (defn name->ip [name]
-  (debug "starting client ...")
-  (debug "listening for dns response ...")
-
   (let [message-bytes (a-query name)
         messages (async/timeout 2000)
         queue-message (fn [& parameters]
                         (>!! messages parameters))
         {send :send close :close} (socket multicast-host mdns-port queue-message)]
 
-    (debug "sending mdns request")
     (send multicast-host mdns-port message-bytes)
-    (debug "sent mdns request")
-
     (->
       (->>
         (result-sequence messages close)
@@ -55,24 +49,17 @@
       (first))))
 
 (defn service->names [service-path]
-  (debug "starting browser ...")
-  (debug "listening for mdns response ...")
-
   (let [message-bytes (ptr-query service-path)
         messages (async/chan 10)
         queue-message (fn [& parameters]
                         (>!! messages parameters))
         {send :send close :close} (socket multicast-host mdns-port queue-message)]
 
-    (debug "sending mdns request")
     (send multicast-host mdns-port message-bytes)
-    (debug "sent mdns request")
-
     ;listen a limited time for responses
     (future
       (Thread/sleep 2000)
       (async/close! messages))
-
     (set
       (->>
         (result-sequence messages close)
