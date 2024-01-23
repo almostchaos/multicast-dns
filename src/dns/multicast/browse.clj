@@ -16,11 +16,11 @@
 
 (defn- result-sequence [messages end-callback]
   (lazy-seq
-    (let [message messages]
+    (let [message (<!! messages)]
       (if (nil? message)
         (do
           (end-callback)
-          message)
+          nil)
         (cons message (result-sequence messages end-callback))))))
 
 (defn name->ip [name]
