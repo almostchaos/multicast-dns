@@ -3,8 +3,7 @@
     [clojure.core.async :as async :refer [<!! >!!]]
     [dns.encoding :refer :all]
     [dns.message :refer [a-query ptr-query]]
-    [socket.io.udp :refer [socket]]
-    [taoensso.timbre :refer [debug]]))
+    [socket.io.udp :refer [socket]]))
 
 (def mdns-port 5353)
 (def multicast-host "224.0.0.251")
