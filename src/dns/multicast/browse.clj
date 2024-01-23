@@ -16,7 +16,7 @@
 
 (defn- result-sequence [messages end-callback]
   (lazy-seq
-    (let [message (<!! messages)]
+    (let [message messages]
       (if (nil? message)
         (do
           (end-callback)
@@ -28,7 +28,7 @@
   (debug "listening for dns response ...")
 
   (let [message-bytes (a-query name)
-        messages (async/timeout 5000)
+        messages (async/timeout 2000)
         queue-message (fn [& parameters]
                         (>!! messages parameters))
         {send :send close :close} (socket multicast-host mdns-port queue-message)]
@@ -59,7 +59,7 @@
   (debug "listening for mdns response ...")
 
   (let [message-bytes (ptr-query service-path)
-        messages (async/timeout 10000)
+        messages (async/chan 10)
         queue-message (fn [& parameters]
                         (>!! messages parameters))
         {send :send close :close} (socket multicast-host mdns-port queue-message)]
@@ -67,6 +67,11 @@
     (debug "sending mdns request")
     (send multicast-host mdns-port message-bytes)
     (debug "sent mdns request")
+
+    ;listen a limited time for responses
+    (future
+      (Thread/sleep 2000)
+      (async/close! messages))
 
     (set
       (->>
@@ -83,7 +88,7 @@
             (-> (filter match-a message) (first) (:NAME))))))))
 
 (defn -main [& args]
-  ;;(run! println (service->names "_octoprint._tcp.local"))
-  (println (name->ip "octopi.local"))
+  (run! println (service->names "_octoprint._tcp.local"))
+  ;;(println (name->ip "octopi.local"))
 
   (shutdown-agents))
