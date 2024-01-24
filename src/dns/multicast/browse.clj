@@ -25,17 +25,15 @@
 (defn name->ip [name]
   (let [message-bytes (a-query name)
         messages (async/timeout 2000)
-        queue-message (fn [& parameters]
-                        (>!! messages parameters))
+        queue-message (fn [_ _ message]
+                        (>!! messages message))
         {send :send close :close} (socket multicast-host mdns-port queue-message)]
 
     (send multicast-host mdns-port message-bytes)
     (->
       (->>
         (result-sequence messages close)
-        (map
-          (fn [[host port message]]
-            (decode-message message)))
+        (map decode-message)
         (filter
           (fn [message]
             (= name (-> (filter match-a message) (first) (:NAME)))))
@@ -50,8 +48,8 @@
 (defn service->names [service-path]
   (let [message-bytes (ptr-query service-path)
         messages (async/chan 10)
-        queue-message (fn [& parameters]
-                        (>!! messages parameters))
+        queue-message (fn [_ _ message]
+                        (>!! messages message))
         {send :send close :close} (socket multicast-host mdns-port queue-message)]
 
     (send multicast-host mdns-port message-bytes)
@@ -62,8 +60,7 @@
     (set
       (->>
         (result-sequence messages close)
-        (map
-          (fn [[host port message]] (decode-message message)))
+        (map decode-message)
         (filter
           (fn [message]
             (and
@@ -75,6 +72,6 @@
 
 (defn -main [& args]
   (run! println (service->names "_octoprint._tcp.local"))
-  ;;(println (name->ip "octopi.local"))
+  (println (name->ip "octopi.local"))
 
   (shutdown-agents))
