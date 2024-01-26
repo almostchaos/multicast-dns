@@ -5,8 +5,8 @@
     [dns.message :refer [a-query ptr-query]]
     [socket.io.udp :refer [socket]]))
 
-(def mdns-port 5353)
-(def multicast-host "224.0.0.251")
+(def port 5353)
+(def address "224.0.0.251")
 
 (defn- resource-type-matcher [type] (fn [section] (= type (:TYPE section))))
 (def match-ptr (resource-type-matcher type:PTR))
@@ -24,15 +24,14 @@
 
 (defn name->ip [name]
   (let [message-bytes (a-query name)
-        messages (async/timeout 2000)
-        queue-message (fn [_ _ message]
-                        (>!! messages message))
-        {send :send close :close} (socket multicast-host mdns-port queue-message)]
+        messages (async/timeout 3000)
+        enqueue (fn [_ _ message] (>!! messages message))
+        {send :send close-socket :close} (socket address port enqueue)]
 
-    (send multicast-host mdns-port message-bytes)
+    (send address port message-bytes)
     (->
       (->>
-        (result-sequence messages close)
+        (result-sequence messages close-socket)
         (map decode-message)
         (filter
           (fn [message]
@@ -48,18 +47,17 @@
 (defn service->names [service-path]
   (let [message-bytes (ptr-query service-path)
         messages (async/chan 10)
-        queue-message (fn [_ _ message]
-                        (>!! messages message))
-        {send :send close :close} (socket multicast-host mdns-port queue-message)]
+        enqueue (fn [_ _ message] (>!! messages message))
+        {send :send close-socket :close} (socket address port enqueue)]
 
-    (send multicast-host mdns-port message-bytes)
+    (send address port message-bytes)
     ;listen a limited time for responses
     (future
-      (Thread/sleep 2000)
+      (Thread/sleep 3000)
       (async/close! messages))
     (set
       (->>
-        (result-sequence messages close)
+        (result-sequence messages close-socket)
         (map decode-message)
         (filter
           (fn [message]
