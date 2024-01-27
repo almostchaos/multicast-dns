@@ -12,9 +12,8 @@
   (let [inet-address (InetAddress/getByName address)
         socket-address (new InetSocketAddress inet-address port)
         inet-socket (if (.isMulticastAddress inet-address)
-                      (let [multicast-socket (new MulticastSocket port)
-                            network-interface (NetworkInterface/getByInetAddress inet-address)]
-                        (.joinGroup multicast-socket socket-address network-interface)
+                      (let [multicast-socket (new MulticastSocket port)]
+                        (.joinGroup multicast-socket socket-address nil)
                         multicast-socket)
 
                       (new DatagramSocket socket-address))]
