@@ -1,4 +1,4 @@
-(ns dns.multicast.browse
+(ns dns.multicast.client
   (:require
     [clojure.core.async :as async :refer [<!! >!!]]
     [dns.encoding :refer :all]
