@@ -24,7 +24,7 @@
 
 (defn name->ip [name]
   (let [message-bytes (a-query name)
-        messages (async/timeout 3000)
+        messages (async/timeout 1000)
         enqueue (fn [_ _ message] (>!! messages message))
         {send :send close-socket :close} (socket address port enqueue)]
 
@@ -53,7 +53,7 @@
     (send address port message-bytes)
     ;listen a limited time for responses
     (future
-      (Thread/sleep 3000)
+      (Thread/sleep 1000)
       (async/close! messages))
     (set
       (->>
