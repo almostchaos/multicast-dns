@@ -13,14 +13,12 @@
 (def match-srv (resource-type-matcher type:SRV))
 (def match-a (resource-type-matcher type:A))
 
-(defn- result-sequence [messages end-callback]
+(defn- drain-channel-sequence [channel end]
   (lazy-seq
-    (let [message (<!! messages)]
-      (if (nil? message)
-        (do
-          (end-callback)
-          nil)
-        (cons message (result-sequence messages end-callback))))))
+    (let [item (<!! channel)]
+      (if (nil? item)
+        (do (end) nil)
+        (cons item (drain-channel-sequence channel end))))))
 
 (defn name->ip [name]
   (let [message-bytes (a-query name)
@@ -31,7 +29,7 @@
     (send address port message-bytes)
     (->
       (->>
-        (result-sequence messages close-socket)
+        (drain-channel-sequence messages close-socket)
         (map decode-message)
         (filter
           (fn [message]
@@ -53,11 +51,11 @@
     (send address port message-bytes)
     ;listen a limited time for responses
     (future
-      (Thread/sleep 1000)
+      (Thread/sleep 2000)
       (async/close! messages))
     (set
       (->>
-        (result-sequence messages close-socket)
+        (drain-channel-sequence messages close-socket)
         (map decode-message)
         (filter
           (fn [message]
