@@ -15,14 +15,12 @@
     (not (:QR (first message)))
     (= type:PTR (:QTYPE (second message)))))
 
-(defn- result-sequence [messages end-callback]
+(defn- drain-channel-sequence [channel end]
   (lazy-seq
-    (let [message (<!! messages)]
-      (if (nil? message)
-        (do
-          (end-callback)
-          nil)
-        (cons message (result-sequence messages end-callback))))))
+    (let [item (<!! channel)]
+      (if (nil? item)
+        (do (end) nil)
+        (cons item (drain-channel-sequence channel end))))))
 
 (defn serve []
   (let [messages (async/chan 10)
@@ -32,14 +30,15 @@
         {send         :send
          close-socket :close} (socket address port enqueue)
         respond (fn [name]
+                  (println "received" name)
                   (when-let [response (get @services name)]
                     ;(send address port (encode-message message))
-                    (println "sending" response)))]
+                    (println "sending" name)))]
     (future
       (run! respond
             (flatten
               (->>
-                (result-sequence messages close-socket)
+                (drain-channel-sequence messages close-socket)
                 (map decode-message)
                 (filter ptr-query?)
                 (map
