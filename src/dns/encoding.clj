@@ -30,8 +30,23 @@
     (fn [result b]
       (bit-or (byte->long b) (bit-shift-left result 8))) 0 bytes))
 
+(defn- long->second-ls-byte [value]
+  (bit-and 0xff (bit-shift-left value 8)))
+
+(defn long->first-ls-byte [value]
+  (bit-and 0xff value))
+
+(defn- long->first-ls-byte [value]
+  (bit-and 0xff value))
+
+(defn- long->first-ls-byte [value]
+  (bit-and 0xff value))
+
+(defn- long->byte [value]
+  (byte (- (long->first-ls-byte value) 128)))
+
 (defn- rand-byte []
-  (byte (- (rand-int 256) 128)))
+  (byte (- (rand-int 255) 128)))
 
 (def flag:disabled false)
 (def flag:enabled true)
@@ -59,22 +74,32 @@
 
 (defn encode-header [& parameters]
   (let [header (apply hash-map parameters)
-        qp-code (:OPCODE header)
-        r-code (:RCODE header)
         qr (:QR header)
+        op-code (:OPCODE header)
         aa (:AA header)
         tc (:TC header)
         rd (:RD header)
-        ra (:RA header)]
+        ra (:RA header)
+        r-code (:RCODE header)
+        qd-count (:QDCOUNT header)
+        an-count (:ANCOUNT header)
+        ns-count (:NSCOUNT header)
+        ar-count (:ARCOUNT header)]
     (byte-array
       [(rand-byte)
        (rand-byte)
        (bits->byte
-         qr (nth qp-code 3) (nth qp-code 2) (nth qp-code 1) (nth qp-code 0) aa tc rd)
+         qr (nth op-code 3) (nth op-code 2) (nth op-code 1) (nth op-code 0) aa tc rd)
        (bits->byte
          ra false false false (nth r-code 3) (nth r-code 2) (nth r-code 1) (nth r-code 0))
-       ;;one question per message is assumed
-       0 1 0 0 0 0 0 0])))
+       (long->second-ls-byte qd-count)
+       (long->first-ls-byte qd-count)
+       (long->second-ls-byte an-count)
+       (long->first-ls-byte an-count)
+       (long->second-ls-byte ns-count)
+       (long->first-ls-byte ns-count)
+       (long->second-ls-byte ar-count)
+       (long->first-ls-byte ar-count)])))
 
 (defn encode-question [path type class]
   (byte-array-concat
@@ -85,6 +110,20 @@
           (byte-array-concat path-bytes count-bytes name-bytes)))
       (byte-array 0) path)
     [0 0 type 0 class]))
+
+(defn encode-name [path]
+  (byte-array
+    (concat
+      (flatten (map (fn [name] [(count name) name])))
+      [0])))
+
+(defn encode-answer [name type class]
+  (byte-array-concat
+    (encode-name name)
+    ;todo ... finish
+    [0 class]
+    [0 0 0 (long->byte 255)]
+    [0 0]))
 
 (defn- decode-header [header-bytes]
   (let [[id-ms id-ls
