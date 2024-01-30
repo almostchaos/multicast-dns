@@ -6,16 +6,6 @@
 (defn byte-array-concat [& byte-arrays]
   (byte-array (mapcat seq byte-arrays)))
 
-(defn bits->byte [& bits]
-  (byte
-    (reduce
-      (fn [result [index bit]]
-        (bit-or (bit-shift-left (if bit 1 0) index) result))
-      0
-      (map-indexed
-        (fn [index bit] [index bit])
-        (take 8 bits)))))
-
 (defn- byte->bits [value]
   (boolean-array (reverse (map (partial bit-test value) (range 8)))))
 
@@ -31,12 +21,24 @@
       (bit-or (byte->long b) (bit-shift-left result 8))) 0 bytes))
 
 (defn- long->byte [value]
-  (byte (if (> value 127) (- 127 value) value)))
+  (byte (if (> value 127) (- value 256) value)))
+
+(defn- bits->byte [bits]
+  (long->byte
+    (reduce
+      (fn [result [index bit]]
+        (if bit
+          (bit-set result index)
+          result))
+      0
+      (map-indexed
+        (fn [index bit] [index bit])
+        (reverse (drop (- (count bits) 8) bits))))))
 
 (defn- rand-byte []
   (byte (- (rand-int 255) 128)))
 
-(defn long->byte-array [long-value]
+(defn- long->byte-array [long-value]
   (loop [index 0
          value long-value
          previous nil]
@@ -85,11 +87,11 @@
         [_ _ _ _ _ _ ns-count-ms ns-count-ls] (long->byte-array (:NSCOUNT header))
         [_ _ _ _ _ _ ar-count-ms ar-count-ls] (long->byte-array (:ARCOUNT header))]
     (byte-array
-      (let [value (bits->byte qr op-code-3 op-code-2 op-code-1 op-code-0 aa tc rd)]
+      (let [value (bits->byte [qr op-code-3 op-code-2 op-code-1 op-code-0 aa tc rd])]
         [(rand-byte)
          (rand-byte)
          value
-         (bits->byte ra false false false r-code-3 r-code-2 r-code-1 r-code-0)
+         (bits->byte [ra false false false r-code-3 r-code-2 r-code-1 r-code-0])
          qd-count-ms qd-count-ls
          an-count-ms an-count-ls
          ns-count-ms ns-count-ls
