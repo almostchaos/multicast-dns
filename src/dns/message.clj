@@ -1,6 +1,7 @@
 (ns dns.message
   (:require
     [clojure.string :as string]
+    [clj-commons.byte-streams :refer [to-byte-array]]
     [dns.encoding :refer :all]))
 
 (defn ptr-query [service-path]
@@ -59,4 +60,4 @@
         :NSCOUNT 0
         :ARCOUNT 0)
       (encode-question path type:PTR class:IN)
-      (encode-answer path type:PTR class:IN))))
+      (encode-answer path type:PTR class:IN (to-byte-array "")))))

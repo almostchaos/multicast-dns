@@ -40,12 +40,12 @@
   (loop [index 0
          value long-value
          previous nil]
-      (if (< index 8)
-        (recur
-          (inc index)
-          (bit-shift-right value 8)
-          (cons (long->byte (bit-and 0xff value)) previous))
-        previous)))
+    (if (< index 8)
+      (recur
+        (inc index)
+        (bit-shift-right value 8)
+        (cons (long->byte (bit-and 0xff value)) previous))
+      previous)))
 
 (def flag:disabled false)
 (def flag:enabled true)
@@ -85,14 +85,15 @@
         [_ _ _ _ _ _ ns-count-ms ns-count-ls] (long->byte-array (:NSCOUNT header))
         [_ _ _ _ _ _ ar-count-ms ar-count-ls] (long->byte-array (:ARCOUNT header))]
     (byte-array
-      [(rand-byte)
-       (rand-byte)
-       (bits->byte qr op-code-3 op-code-2 op-code-1 op-code-0 aa tc rd)
-       (bits->byte ra false false false r-code-3 r-code-2 r-code-1 r-code-0)
-       qd-count-ms qd-count-ls
-       an-count-ms an-count-ls
-       ns-count-ms ns-count-ls
-       ar-count-ms ar-count-ls])))
+      (let [value (bits->byte qr op-code-3 op-code-2 op-code-1 op-code-0 aa tc rd)]
+        [(rand-byte)
+         (rand-byte)
+         value
+         (bits->byte ra false false false r-code-3 r-code-2 r-code-1 r-code-0)
+         qd-count-ms qd-count-ls
+         an-count-ms an-count-ls
+         ns-count-ms ns-count-ls
+         ar-count-ms ar-count-ls]))))
 
 (defn encode-question [path type class]
   (byte-array-concat
@@ -105,18 +106,30 @@
     [0 0 type 0 class]))
 
 (defn encode-name [path]
-  (byte-array
-    (concat
-      (flatten (map (fn [name] [(count name) name])))
-      [0])))
-
-(defn encode-answer [name type class]
   (byte-array-concat
-    (encode-name name)
-    ;todo ... finish
-    [0 class]
-    [0 0 0 (long->byte 255)]
-    [0 0]))
+    (flatten
+      (map (fn [name]
+             (cons
+               (long->byte (count name))
+               (to-byte-array name)))
+           path))
+    [0]))
+
+(defn encode-answer [service type class data]
+  (let [ttl 2000
+        rd-length (alength data)
+        [_ _ _ _ _ _ type-ms type-ls] (long->byte-array type)
+        [_ _ _ _ _ _ class-ms class-ls] (long->byte-array class)
+        [_ _ _ _ ttl-3 ttl-2 ttl-1 ttl-0] (long->byte-array ttl)
+        [_ _ _ _ _ _ rd-length-ms rd-length-ls] (long->byte-array rd-length)
+        name (encode-name service)]
+    (byte-array-concat
+      name
+      [type-ms type-ls
+       class-ms class-ls
+       ttl-3 ttl-2 ttl-1 ttl-0
+       rd-length-ms rd-length-ls]
+      data)))
 
 (defn- decode-header [header-bytes]
   (let [[id-ms id-ls

@@ -1,7 +1,9 @@
 (ns dns.multicast.server
   (:require
+    [clj-commons.byte-streams :refer [print-bytes]]
     [clojure.core.async :as async :refer [<!! >!!]]
     [dns.encoding :refer :all]
+    [dns.message :refer :all]
     [socket.io.udp :refer [socket]]))
 
 (def port 5353)
@@ -32,8 +34,12 @@
         respond (fn [name]
                   (println "received" name)
                   (when-let [response (get @services name)]
-                    ;(send address port (encode-message message))
-                    (println "sending" name)))]
+                    (try
+                      (let [message-bytes (ptr-answer name)]
+                        (println "sending...")
+                        (print-bytes message-bytes)
+                        (send address port message-bytes))
+                      (catch Exception e (println e)))))]
     (future
       (run! respond
             (flatten
