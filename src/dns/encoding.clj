@@ -30,23 +30,22 @@
     (fn [result b]
       (bit-or (byte->long b) (bit-shift-left result 8))) 0 bytes))
 
-(defn- long->second-ls-byte [value]
-  (bit-and 0xff (bit-shift-left value 8)))
-
-(defn long->first-ls-byte [value]
-  (bit-and 0xff value))
-
-(defn- long->first-ls-byte [value]
-  (bit-and 0xff value))
-
-(defn- long->first-ls-byte [value]
-  (bit-and 0xff value))
-
 (defn- long->byte [value]
-  (byte (- (long->first-ls-byte value) 128)))
+  (byte (if (> value 127) (- 127 value) value)))
 
 (defn- rand-byte []
   (byte (- (rand-int 255) 128)))
+
+(defn long->byte-array [long-value]
+  (loop [index 0
+         value long-value
+         previous nil]
+      (if (< index 8)
+        (recur
+          (inc index)
+          (bit-shift-right value 8)
+          (cons (long->byte (bit-and 0xff value)) previous))
+        previous)))
 
 (def flag:disabled false)
 (def flag:enabled true)
@@ -75,31 +74,25 @@
 (defn encode-header [& parameters]
   (let [header (apply hash-map parameters)
         qr (:QR header)
-        op-code (:OPCODE header)
+        [op-code-3 op-code-2 op-code-1 op-code-0] (:OPCODE header)
         aa (:AA header)
         tc (:TC header)
         rd (:RD header)
         ra (:RA header)
-        r-code (:RCODE header)
-        qd-count (:QDCOUNT header)
-        an-count (:ANCOUNT header)
-        ns-count (:NSCOUNT header)
-        ar-count (:ARCOUNT header)]
+        [r-code-3 r-code-2 r-code-1 r-code-0] (:RCODE header)
+        [_ _ _ _ _ _ qd-count-ms qd-count-ls] (long->byte-array (:QDCOUNT header))
+        [_ _ _ _ _ _ an-count-ms an-count-ls] (long->byte-array (:ANCOUNT header))
+        [_ _ _ _ _ _ ns-count-ms ns-count-ls] (long->byte-array (:NSCOUNT header))
+        [_ _ _ _ _ _ ar-count-ms ar-count-ls] (long->byte-array (:ARCOUNT header))]
     (byte-array
       [(rand-byte)
        (rand-byte)
-       (bits->byte
-         qr (nth op-code 3) (nth op-code 2) (nth op-code 1) (nth op-code 0) aa tc rd)
-       (bits->byte
-         ra false false false (nth r-code 3) (nth r-code 2) (nth r-code 1) (nth r-code 0))
-       (long->second-ls-byte qd-count)
-       (long->first-ls-byte qd-count)
-       (long->second-ls-byte an-count)
-       (long->first-ls-byte an-count)
-       (long->second-ls-byte ns-count)
-       (long->first-ls-byte ns-count)
-       (long->second-ls-byte ar-count)
-       (long->first-ls-byte ar-count)])))
+       (bits->byte qr op-code-3 op-code-2 op-code-1 op-code-0 aa tc rd)
+       (bits->byte ra false false false r-code-3 r-code-2 r-code-1 r-code-0)
+       qd-count-ms qd-count-ls
+       an-count-ms an-count-ls
+       ns-count-ms ns-count-ls
+       ar-count-ms ar-count-ls])))
 
 (defn encode-question [path type class]
   (byte-array-concat
