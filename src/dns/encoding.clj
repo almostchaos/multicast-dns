@@ -38,7 +38,7 @@
 (defn- rand-byte []
   (byte (- (rand-int 255) 128)))
 
-(defn- long->byte-array [long-value]
+(defn long->byte-array [long-value]
   (loop [index 0
          value long-value
          previous nil]
@@ -117,9 +117,8 @@
            path))
     [0]))
 
-(defn encode-answer [service type class data]
-  (let [ttl 2000
-        rd-length (alength data)
+(defn encode-answer [service type class ttl data]
+  (let [rd-length (alength data)
         [_ _ _ _ _ _ type-ms type-ls] (long->byte-array type)
         [_ _ _ _ _ _ class-ms class-ls] (long->byte-array class)
         [_ _ _ _ ttl-3 ttl-2 ttl-1 ttl-0] (long->byte-array ttl)
