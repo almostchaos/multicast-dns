@@ -73,16 +73,13 @@
         :ANCOUNT 1
         :NSCOUNT 0
         :ARCOUNT (if (empty? txt) 2 3))
-      (encode-answer service-name type:PTR class:IN ttl
-                     (encode-name service-instance))
+      (encode-answer service-name type:PTR class:IN ttl (encode-name service-instance))
       (encode-answer service-instance type:SRV class:IN ttl
                      (byte-array-concat
                        [priority-ms priority-ls
                         weight-ms weight-ls
                         port-ms port-ls]
                        (encode-name host)))
-      (encode-answer host type:A class:IN ttl
-                     (byte-array (->> ip (map parse-long) (map long->byte))))
+      (encode-answer host type:A class:IN ttl (encode-address ip))
       (when-not (empty? txt)
-        (encode-answer service-instance type:TXT class:IN ttl
-                       (encode-txt txt))))))
+        (encode-answer service-instance type:TXT class:IN ttl (encode-txt txt))))))

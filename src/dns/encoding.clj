@@ -127,6 +127,9 @@
                  (to-byte-array property))))
            properties))))
 
+(defn encode-address [ip]
+  (byte-array (->> ip (map parse-long) (map long->byte))))
+
 (defn encode-answer [service type class ttl data]
   (let [rd-length (alength data)
         [type-ms type-ls] (drop 6 (long->byte-array type))
