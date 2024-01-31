@@ -9,9 +9,6 @@
 (def port 5353)
 (def address "224.0.0.251")
 
-(defn encode-message [message]
-  )
-
 (defn- ptr-query? [message]
   (and
     (not (:QR (first message)))
@@ -24,7 +21,7 @@
         (do (end) nil)
         (cons item (drain-channel-sequence channel end))))))
 
-(defn serve []
+(defn listen []
   (let [messages (async/chan 10)
         services (atom {})
         enqueue (fn [_ _ message]
@@ -41,28 +38,26 @@
                         (send address port message-bytes))
                       (catch Exception e (println e)))))]
     (future
-      (run! respond
-            (flatten
-              (->>
-                (drain-channel-sequence messages close-socket)
-                (map decode-message)
-                (filter ptr-query?)
-                (map
-                  (fn [message]
-                    (let [header (first message)
-                          sections (rest message)
-                          query-count (:QDCOUNT header)
-                          queries (take query-count sections)]
-                      (map :QNAME queries))))))))
-    {:register (fn [name]
-                 (swap! services assoc name (keyword name)))
+      (run! respond (flatten
+                      (->>
+                        (drain-channel-sequence messages close-socket)
+                        (map decode-message)
+                        (filter ptr-query?)
+                        (map (fn [message]
+                               (let [header (first message)
+                                     sections (rest message)
+                                     query-count (:QDCOUNT header)
+                                     queries (take query-count sections)]
+                                 (map :QNAME queries))))))))
+    {:register (fn [service-type service-instance port txt]
+                 (swap! services assoc service-type [service-instance port txt]))
      :shutdown (fn []
                  (async/close! messages))}))
 
 (defn -main [& args]
   (let [{register :register
-         shutdown :shutdown} (serve)]
-    (register "_spotify-connect._tcp.local")
+         shutdown :shutdown} (listen)]
+    (register "_spotify-connect._tcp.local" "clojure" 36663 nil)
     (future
       (Thread/sleep 36000)
       (println "shutting down...")
