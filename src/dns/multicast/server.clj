@@ -23,11 +23,11 @@
 
 (defn listen []
   (let [messages (async/chan 10)
-        services (atom {})
-        enqueue (fn [_ _ message]
-                  (>!! messages message))
         {send         :send
-         close-socket :close} (socket address port enqueue)
+         close-socket :close} (socket address port (fn [_ _ message]
+                                                     (>!! messages message)))
+        services (atom {})
+        running (atom true)
         respond (fn [name]
                   (println "received" name)
                   (when-let [response (get @services name)]
@@ -36,22 +36,25 @@
                         (println "sending...")
                         (print-bytes message-bytes)
                         (send address port message-bytes))
-                      (catch Exception e (println e)))))]
+                      (catch Exception e (println e)))))
+        queries (flatten
+                  (->>
+                    (drain-channel-sequence messages close-socket)
+                    (map decode-message)
+                    (filter ptr-query?)
+                    (map (fn [message]
+                           (let [query-count (:QDCOUNT (first message))
+                                 message-queries (take query-count (rest message))]
+                             (map :QNAME message-queries))))))]
     (future
-      (run! respond (flatten
-                      (->>
-                        (drain-channel-sequence messages close-socket)
-                        (map decode-message)
-                        (filter ptr-query?)
-                        (map (fn [message]
-                               (let [header (first message)
-                                     sections (rest message)
-                                     query-count (:QDCOUNT header)
-                                     queries (take query-count sections)]
-                                 (map :QNAME queries))))))))
+      (while @running
+        (Thread/sleep 300)
+        (run! respond queries)))
+
     {:register (fn [service-type service-instance port txt]
                  (swap! services assoc service-type [service-instance port txt]))
      :shutdown (fn []
+                 (swap! running not)
                  (async/close! messages))}))
 
 (defn -main [& args]
