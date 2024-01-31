@@ -10,7 +10,6 @@
 
 (defn- resource-type-matcher [type] (fn [section] (= type (:TYPE section))))
 (def match-ptr (resource-type-matcher type:PTR))
-(def match-srv (resource-type-matcher type:SRV))
 (def match-a (resource-type-matcher type:A))
 
 (defn- drain-channel-sequence [channel end]
@@ -21,12 +20,11 @@
         (cons item (drain-channel-sequence channel end))))))
 
 (defn name->ip [name]
-  (let [message-bytes (a-query name)
-        messages (async/timeout 1000)
-        enqueue (fn [_ _ message] (>!! messages message))
-        {send :send close-socket :close} (socket address port enqueue)]
+  (let [messages (async/timeout 1000)
+        receive (fn [_ _ message] (>!! messages message))
+        {send :send close-socket :close} (socket address port receive)]
 
-    (send address port message-bytes)
+    (send address port (a-query name))
     (->
       (->>
         (drain-channel-sequence messages close-socket)
@@ -43,12 +41,11 @@
       (first))))
 
 (defn service->names [service-path]
-  (let [message-bytes (ptr-query service-path)
-        messages (async/chan 10)
-        enqueue (fn [_ _ message] (>!! messages message))
-        {send :send close-socket :close} (socket address port enqueue)]
+  (let [messages (async/chan 10)
+        receive (fn [_ _ message] (>!! messages message))
+        {send :send close-socket :close} (socket address port receive)]
 
-    (send address port message-bytes)
+    (send address port (ptr-query service-path))
     ;listen a limited time for responses
     (future
       (Thread/sleep 2000)

@@ -1,6 +1,5 @@
 (ns dns.message
   (:require
-    [clj-commons.byte-streams :refer [to-byte-array]]
     [clojure.string :as string]
     [dns.encoding :refer :all])
   (:import (java.net InetAddress)))
