@@ -48,9 +48,9 @@
         :ARCOUNT 0)
       (encode-question service-path type:A class:IN))))
 
-(defn ptr-answer [service-path priority weight port txt]
+(defn ptr-answer [service-path instance priority weight port txt]
   (let [service-name (string/split service-path #"\.")
-        service-instance (cons "Clojure" service-name)
+        service-instance (cons instance service-name)
         host (string/split (hostname) #"\.")
         ip (string/split (ip-address) #"\.")
         [priority-ms priority-ls] (drop 6 (long->byte-array priority))

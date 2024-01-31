@@ -29,14 +29,14 @@
                                       (fn [_ _ message] (>!! messages message)))
         services (atom {})
         running (atom true)
-        respond (fn [name]
+        respond (fn [service-type]
                   (run! (fn [[instance instance-port txt]]
                           (try
                             (debug "sending response for" instance "port" instance-port)
-                            (send address port (ptr-answer instance 0 0 instance-port txt))
+                            (send address port (ptr-answer service-type instance 0 0 instance-port txt))
                             (catch Exception e
                               (error e))))
-                        (get @services name)))
+                        (get @services service-type)))
         queries (flatten
                   (->>
                     (drain-channel-sequence messages close-socket)
