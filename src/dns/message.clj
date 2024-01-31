@@ -52,10 +52,10 @@
   (let [service-name (string/split service-path #"\.")
         service-instance (cons "Clojure" service-name)
         host (string/split (hostname) #"\.")
-        [_ _ _ _ _ _ priority-ms priority-ls] (long->byte-array priority)
-        [_ _ _ _ _ _ weight-ms weight-ls] (long->byte-array weight)
-        [_ _ _ _ _ _ port-ms port-ls] (long->byte-array port)
-        ip (string/split (ip-address) #"\.")]
+        ip (string/split (ip-address) #"\.")
+        [priority-ms priority-ls] (drop 6 (long->byte-array priority))
+        [weight-ms weight-ls] (drop 6 (long->byte-array weight))
+        [port-ms port-ls] (drop 6 (long->byte-array port))]
     (byte-array-concat
       (encode-header
         :QR flag:enabled

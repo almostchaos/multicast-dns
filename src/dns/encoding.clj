@@ -119,10 +119,10 @@
 
 (defn encode-answer [service type class ttl data]
   (let [rd-length (alength data)
-        [_ _ _ _ _ _ type-ms type-ls] (long->byte-array type)
-        [_ _ _ _ _ _ class-ms class-ls] (long->byte-array class)
-        [_ _ _ _ ttl-3 ttl-2 ttl-1 ttl-0] (long->byte-array ttl)
-        [_ _ _ _ _ _ rd-length-ms rd-length-ls] (long->byte-array rd-length)
+        [type-ms type-ls] (drop 6 (long->byte-array type))
+        [class-ms class-ls] (drop 6 (long->byte-array class))
+        [ttl-3 ttl-2 ttl-1 ttl-0] (drop 4 (long->byte-array ttl))
+        [rd-length-ms rd-length-ls] (drop 6 (long->byte-array rd-length))
         name (encode-name service)]
     (byte-array-concat
       name
