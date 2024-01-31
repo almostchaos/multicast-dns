@@ -82,10 +82,10 @@
         rd (:RD header)
         ra (:RA header)
         [r-code-3 r-code-2 r-code-1 r-code-0] (:RCODE header)
-        [_ _ _ _ _ _ qd-count-ms qd-count-ls] (long->byte-array (:QDCOUNT header))
-        [_ _ _ _ _ _ an-count-ms an-count-ls] (long->byte-array (:ANCOUNT header))
-        [_ _ _ _ _ _ ns-count-ms ns-count-ls] (long->byte-array (:NSCOUNT header))
-        [_ _ _ _ _ _ ar-count-ms ar-count-ls] (long->byte-array (:ARCOUNT header))]
+        [qd-count-ms qd-count-ls] (drop 6 (long->byte-array (:QDCOUNT header)))
+        [an-count-ms an-count-ls] (drop 6 (long->byte-array (:ANCOUNT header)))
+        [ns-count-ms ns-count-ls] (drop 6 (long->byte-array (:NSCOUNT header)))
+        [ar-count-ms ar-count-ls] (drop 6 (long->byte-array (:ARCOUNT header)))]
     (byte-array
       (let [value (bits->byte [qr op-code-3 op-code-2 op-code-1 op-code-0 aa tc rd])]
         [(rand-byte)
