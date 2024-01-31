@@ -24,9 +24,9 @@
 
 (defn listen []
   (let [messages (async/chan 100)
+        receive (fn [_ _ message] (>!! messages message))
         {send         :send
-         close-socket :close} (socket address port
-                                      (fn [_ _ message] (>!! messages message)))
+         close-socket :close} (socket address port receive)
         services (atom {})
         running (atom true)
         respond (fn [service-type]
@@ -55,7 +55,7 @@
               matching-services (filter (partial get @services) queried-services)]
           (debug "responding to queries:" (string/join ", " matching-services))
           (run! respond matching-services))
-        (Thread/sleep 500)))
+        (Thread/sleep 1000)))
 
     {:advertise (fn [service-type service-instance port txt]
                   (swap! services update service-type
