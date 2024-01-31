@@ -51,7 +51,7 @@
 
       (while @running
         (debug "...")
-        (let [queried-services (set (to-array (take 20 queries)))
+        (let [queried-services (set (take 20 queries))
               matching-services (filter (partial get @services) queried-services)]
           (debug "responding to queries:" (string/join ", " matching-services))
           (run! respond matching-services))
@@ -66,8 +66,9 @@
      :shutdown  (fn []
                   (debug "stopping...")
                   (swap! running not)
-                  (close-socket)
                   (async/close! messages)
+                  ;drain accumulated queries
+                  (run! (constantly nil) queries)
                   (debug "stopped listening"))}))
 
 (defn -main [& args]
