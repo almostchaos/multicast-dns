@@ -20,7 +20,7 @@
     (fn [result b]
       (bit-or (byte->long b) (bit-shift-left result 8))) 0 bytes))
 
-(defn- long->byte [value]
+(defn long->byte [value]
   (byte (if (> value 127) (- value 256) value)))
 
 (defn- bits->byte [bits]

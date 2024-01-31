@@ -7,6 +7,9 @@
 (defn- hostname []
   (.getHostName (InetAddress/getLocalHost)))
 
+(defn- ip-address []
+  (.getHostAddress (InetAddress/getLocalHost)))
+
 (defn ptr-query [service-path]
   (let [path (string/split service-path #"\.")]
     (byte-array-concat
@@ -51,7 +54,8 @@
         host (string/split (hostname) #"\.")
         [_ _ _ _ _ _ priority-ms priority-ls] (long->byte-array priority)
         [_ _ _ _ _ _ weight-ms weight-ls] (long->byte-array weight)
-        [_ _ _ _ _ _ port-ms port-ls] (long->byte-array port)]
+        [_ _ _ _ _ _ port-ms port-ls] (long->byte-array port)
+        ip (string/split (ip-address) #"\.")]
     (byte-array-concat
       (encode-header
         :QR flag:enabled
@@ -66,10 +70,15 @@
         :QDCOUNT 0
         :ANCOUNT 1
         :NSCOUNT 0
-        :ARCOUNT 1)
-      (encode-answer service-name type:PTR class:IN 120 (encode-name service-instance))
+        :ARCOUNT 2)
+      (encode-answer
+        service-name type:PTR class:IN 120
+        (encode-name service-instance))
       (encode-answer
         service-instance type:SRV class:IN 120
         (byte-array-concat
           [priority-ms priority-ls weight-ms weight-ls port-ms port-ls]
-          (encode-name host))))))
+          (encode-name host)))
+      (encode-answer
+        host type:A class:IN 120
+        (byte-array (->> ip (map parse-long) (map long->byte)))))))
