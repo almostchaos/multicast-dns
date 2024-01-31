@@ -1,5 +1,6 @@
 (ns dns.message
   (:require
+    [clj-commons.byte-streams :refer [to-byte-array]]
     [clojure.string :as string]
     [dns.encoding :refer :all])
   (:import (java.net InetAddress)))
@@ -53,6 +54,7 @@
         service-instance (cons instance service-name)
         host (string/split (hostname) #"\.")
         ip (string/split (ip-address) #"\.")
+        ttl 120
         [priority-ms priority-ls] (drop 6 (long->byte-array priority))
         [weight-ms weight-ls] (drop 6 (long->byte-array weight))
         [port-ms port-ls] (drop 6 (long->byte-array port))]
@@ -70,15 +72,17 @@
         :QDCOUNT 0
         :ANCOUNT 1
         :NSCOUNT 0
-        :ARCOUNT 2)
-      (encode-answer
-        service-name type:PTR class:IN 120
-        (encode-name service-instance))
-      (encode-answer
-        service-instance type:SRV class:IN 120
-        (byte-array-concat
-          [priority-ms priority-ls weight-ms weight-ls port-ms port-ls]
-          (encode-name host)))
-      (encode-answer
-        host type:A class:IN 120
-        (byte-array (->> ip (map parse-long) (map long->byte)))))))
+        :ARCOUNT (if (nil? txt) 2 3))
+      (encode-answer service-name type:PTR class:IN ttl
+                     (encode-name service-instance))
+      (encode-answer service-instance type:SRV class:IN ttl
+                     (byte-array-concat
+                       [priority-ms priority-ls
+                        weight-ms weight-ls
+                        port-ms port-ls]
+                       (encode-name host)))
+      (encode-answer host type:A class:IN ttl
+                     (byte-array (->> ip (map parse-long) (map long->byte))))
+      (when-not (nil? txt)
+        (encode-answer service-instance type:TXT class:IN ttl
+                       (encode-txt txt))))))

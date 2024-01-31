@@ -74,8 +74,8 @@
 (defn -main [& args]
   (let [{advertise :advertise
          shutdown  :shutdown} (listen)]
-    (advertise "_spotify-connect._tcp.local" "A" 36663 nil)
-    (advertise "_spotify-connect._tcp.local" "B" 36663 nil)
+    (advertise "_spotify-connect._tcp.local" "A" 36663 {:path "/a"})
+    (advertise "_spotify-connect._tcp.local" "B" 36663 {:path "/b" :q 0})
     (future
       (Thread/sleep 36000)
       (println "shutting down...")

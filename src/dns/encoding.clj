@@ -117,6 +117,16 @@
            path))
     [0]))
 
+(defn encode-txt [properties]
+  (byte-array
+    (flatten
+      (map (fn [[key value]]
+             (let [property (str (name key) "=" value)]
+               (cons
+                 (long->byte (count property))
+                 (to-byte-array property))))
+           properties))))
+
 (defn encode-answer [service type class ttl data]
   (let [rd-length (alength data)
         [type-ms type-ls] (drop 6 (long->byte-array type))
