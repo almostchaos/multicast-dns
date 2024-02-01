@@ -23,12 +23,12 @@
         (cons item (drain-channel-sequence channel end))))))
 
 (defn listen []
-  (let [messages (async/chan 100)
+  (let [services (atom {})
+        running (atom true)
+        messages (async/chan 100)
         receive (fn [_ _ message] (>!! messages message))
         {send         :send
          close-socket :close} (socket address port receive)
-        services (atom {})
-        running (atom true)
         respond (fn [service-type]
                   (run! (fn [[instance instance-port txt]]
                           (try
