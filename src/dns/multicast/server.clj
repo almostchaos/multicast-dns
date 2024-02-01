@@ -1,6 +1,6 @@
 (ns dns.multicast.server
   (:require
-    [clojure.core.async :as async :refer [<!! >!!]]
+    [clojure.core.async :as async :refer [<!! >!! <!]]
     [dns.encoding :refer :all]
     [dns.message :refer :all]
     [socket.io.udp :refer [socket]]
@@ -50,11 +50,12 @@
 
       (while @running
         (debug "...")
-        (loop [service-type (<!! queried-services)]
-          (when-let [matching-services (get @services service-type)]
-            (respond service-type matching-services)
-            (recur (<!! queried-services))))
-        (Thread/sleep 2000)))
+        (async/go
+          (loop [service-type (<! queried-services)]
+            (when-let [matching-services (get @services service-type)]
+              (respond service-type matching-services)
+              (recur (<! queried-services)))))
+        (Thread/sleep 1000)))
 
     {:advertise (fn [service-type service-instance port txt]
                   (swap! services update service-type
