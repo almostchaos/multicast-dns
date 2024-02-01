@@ -10,10 +10,11 @@
 (def port 5353)
 (def address "224.0.0.251")
 
-(defn- ptr-query? [message]
-  (and
-    (not (:QR (first message)))
-    (= type:PTR (:QTYPE (second message)))))
+(defn- query? [message]
+  (not (:QR (first message))))
+
+(defn- ptr-query? [section]
+  (= type:PTR (:QTYPE section)))
 
 (defn- drain-channel-sequence [channel end]
   (lazy-seq
@@ -41,11 +42,14 @@
                   (->>
                     (drain-channel-sequence messages close-socket)
                     (map decode-message)
-                    (filter ptr-query?)
+                    (filter query?)
                     (map (fn [message]
                            (let [query-count (:QDCOUNT (first message))
-                                 message-queries (take query-count (rest message))]
-                             (map :QNAME message-queries))))))]
+                                 ptr-queries (->>
+                                               (rest message)
+                                               (take query-count)
+                                               (filter ptr-query?))]
+                             (map :QNAME ptr-queries))))))]
     (future
       (debug "starting to listen...")
 
