@@ -1,7 +1,6 @@
 (ns dns.multicast.server
   (:require
     [clojure.core.async :as async :refer [<!! >!!]]
-    [clojure.string :as string]
     [dns.encoding :refer :all]
     [dns.message :refer :all]
     [socket.io.udp :refer [socket]]
@@ -13,7 +12,7 @@
 (defn- query? [message]
   (not (:QR (first message))))
 
-(defn- ptr-query? [section]
+(defn- ptr-question? [section]
   (= type:PTR (:QTYPE section)))
 
 (defn- drain-channel-sequence [channel end]
@@ -26,40 +25,36 @@
 (defn listen []
   (let [services (atom {})
         running (atom true)
-        messages (async/chan 100)
-        receive (fn [_ _ message] (>!! messages message))
+        queried-services (async/chan 100)
+        receive (fn [_ _ packet]
+                  (let [message (decode-message packet)]
+                    (when (query? message)
+                      (->>
+                        (rest message)
+                        (filter ptr-question?)
+                        (map :QNAME)
+                        (run! (partial >!! queried-services))))))
+
         {send         :send
          close-socket :close} (socket address port receive)
-        respond (fn [service-type]
+        respond (fn [service-type service-instances]
                   (run! (fn [[instance instance-port txt]]
                           (try
                             (debug "sending response for" instance "port" instance-port)
                             (send address port (ptr-answer service-type instance 0 0 instance-port txt))
                             (catch Exception e
                               (error e))))
-                        (get @services service-type)))
-        queries (flatten
-                  (->>
-                    (drain-channel-sequence messages close-socket)
-                    (map decode-message)
-                    (filter query?)
-                    (map (fn [message]
-                           (let [query-count (:QDCOUNT (first message))
-                                 ptr-queries (->>
-                                               (rest message)
-                                               (take query-count)
-                                               (filter ptr-query?))]
-                             (map :QNAME ptr-queries))))))]
+                        service-instances))]
     (future
       (debug "starting to listen...")
 
       (while @running
         (debug "...")
-        (let [queried-services (set (take 20 queries))
-              matching-services (filter (partial get @services) queried-services)]
-          (debug "responding to queries:" (string/join ", " matching-services))
-          (run! respond matching-services))
-        (Thread/sleep 1000)))
+        (loop [service-type (<!! queried-services)]
+          (when-let [matching-services (get @services service-type)]
+            (respond service-type matching-services)
+            (recur (<!! queried-services))))
+        (Thread/sleep 2000)))
 
     {:advertise (fn [service-type service-instance port txt]
                   (swap! services update service-type
@@ -70,16 +65,15 @@
      :shutdown  (fn []
                   (debug "stopping...")
                   (swap! running not)
-                  (async/close! messages)
-                  ;drain accumulated queries
-                  (run! (constantly nil) queries)
+                  (close-socket)
+                  (async/close! queried-services)
                   (debug "stopped listening"))}))
 
 (defn -main [& args]
   (let [{advertise :advertise
          shutdown  :shutdown} (listen)]
-    (advertise "_spotify-connect._tcp.local" "A" 36663 {:path "/a"})
-    (advertise "_spotify-connect._tcp.local" "B" 36663 {:path "/b" :q 0})
+    (advertise "_zzzzz._tcp.local" "A" 36663 {:path "/a"})
+    (advertise "_zzzzz._tcp.local" "B" 36663 {:path "/b" :q 0})
     (future
       (Thread/sleep 36000)
       (println "shutting down...")

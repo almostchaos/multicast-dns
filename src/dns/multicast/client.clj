@@ -64,7 +64,9 @@
             (-> (filter match-a message) (first) (:NAME))))))))
 
 (defn -main [& args]
-  (run! println (service->names "_octoprint._tcp.local"))
-  (println (name->ip "octopi.local"))
+  (run! println (service->names "_zzzzz._tcp.local"))
+  ;(Thread/sleep 1300)
+  ;(run! println (service->names "_zzz._tcp.local"))
+  ;(println (name->ip "octopi.local"))
 
   (shutdown-agents))
