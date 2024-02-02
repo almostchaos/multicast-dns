@@ -63,18 +63,18 @@
                 (respond service-type service-instances)))
             service-types))))
 
-  {:advertise (fn [service-type service-instance port txt]
-                (swap! services update service-type
-                       (fn [instances]
-                         (if (nil? instances)
-                           [[service-instance port txt]]
-                           (cons [service-instance port txt] instances)))))
-   :shutdown  (fn []
-                (debug "stopping...")
-                (swap! running not)
-                (close-socket)
-                (async/close! queried-services)
-                (debug "stopped listening"))}) )
+    {:advertise (fn [service-type service-instance port txt]
+                  (swap! services update service-type
+                         (fn [instances]
+                           (if (nil? instances)
+                             [[service-instance port txt]]
+                             (cons [service-instance port txt] instances)))))
+     :shutdown  (fn []
+                  (debug "stopping...")
+                  (swap! running not)
+                  (close-socket)
+                  (async/close! queried-services)
+                  (debug "stopped listening"))}))
 
 (defn -main [& args]
   (let [{advertise :advertise
