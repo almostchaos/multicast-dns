@@ -1,10 +1,10 @@
 (ns dns.multicast.server
   (:require
-    [clojure.core.async :as async :refer [<!! >!! <!]]
+    [clojure.core.async :as async :refer [>!! alts!!]]
     [dns.encoding :refer :all]
     [dns.message :refer :all]
     [socket.io.udp :refer [socket]]
-    [taoensso.timbre :refer [debug error]]))
+    [taoensso.timbre :refer [debug error info]]))
 
 (def port 5353)
 (def address "224.0.0.251")
@@ -15,12 +15,19 @@
 (defn- ptr-question? [section]
   (= type:PTR (:QTYPE section)))
 
-(defn- drain-channel-sequence [channel end]
+(defmacro on-term-signal [& handler]
+  `(.addShutdownHook
+     (Runtime/getRuntime)
+     (new Thread
+          (fn []
+            (debug "sigterm captured")
+            ~@handler))))
+
+(defn- drain-channel-sequence [channel exit]
   (lazy-seq
-    (let [item (<!! channel)]
-      (if (nil? item)
-        (do (end) nil)
-        (cons item (drain-channel-sequence channel end))))))
+    (let [[item channel] (alts!! [channel exit])]
+      (when-not (nil? item)
+        (cons item (drain-channel-sequence channel exit))))))
 
 (defn listen []
   (let [services (atom {})
@@ -46,37 +53,35 @@
                               (error e))))
                         service-instances))]
     (future
-      (debug "starting to listen...")
-
+      (info "starting to listen...")
       (while @running
-        (debug "...")
-        (async/go
-          (loop [service-type (<! queried-services)]
-            (when-let [matching-services (get @services service-type)]
-              (respond service-type matching-services)
-              (recur (<! queried-services)))))
-        (Thread/sleep 1000)))
+        ;(debug "...")
+        (let [service-types (set (drain-channel-sequence queried-services (async/timeout 1000)))]
+          (run!
+            (fn [service-type]
+              (when-let [service-instances (get @services service-type)]
+                (respond service-type service-instances)))
+            service-types))))
 
-    {:advertise (fn [service-type service-instance port txt]
-                  (swap! services update service-type
-                         (fn [instances]
-                           (if (nil? instances)
-                             [[service-instance port txt]]
-                             (cons [service-instance port txt] instances)))))
-     :shutdown  (fn []
-                  (debug "stopping...")
-                  (swap! running not)
-                  (close-socket)
-                  (async/close! queried-services)
-                  (debug "stopped listening"))}))
+  {:advertise (fn [service-type service-instance port txt]
+                (swap! services update service-type
+                       (fn [instances]
+                         (if (nil? instances)
+                           [[service-instance port txt]]
+                           (cons [service-instance port txt] instances)))))
+   :shutdown  (fn []
+                (debug "stopping...")
+                (swap! running not)
+                (close-socket)
+                (async/close! queried-services)
+                (debug "stopped listening"))}) )
 
 (defn -main [& args]
   (let [{advertise :advertise
          shutdown  :shutdown} (listen)]
     (advertise "_zzzzz._tcp.local" "A" 36663 {:path "/a"})
     (advertise "_zzzzz._tcp.local" "B" 36663 {:path "/b" :q 0})
-    (future
-      (Thread/sleep 36000)
-      (println "shutting down...")
+    (on-term-signal
+      (info "shutting down...")
       (shutdown)
       (shutdown-agents))))
