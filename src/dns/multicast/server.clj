@@ -57,7 +57,7 @@
       (while @running
         ;(debug "...")
         (let [timed-exit (async/timeout 1000)
-              service-types (set (drain-channel-sequence queried-service-types timed-exit))]
+              service-types (distinct (drain-channel-sequence queried-service-types timed-exit))]
           (run!
             (fn [service-type]
               (when-let [service-instances (get @services service-type)]
