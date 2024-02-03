@@ -71,7 +71,7 @@
                              (if (nil? instances)
                                {service-instance entry}
                                (assoc instances service-instance entry))))))
-     :shutdown  (fn []
+     :stop      (fn []
                   (debug "stopping...")
                   (swap! running not)
                   (close-socket)
@@ -80,7 +80,7 @@
 
 (defn -main [& args]
   (let [{advertise :advertise
-         shutdown  :shutdown} (listen)]
+         shutdown  :stop} (listen)]
     (advertise "_zzzzz._tcp.local" "A" 36663 {:path "/a"})
     (advertise "_zzzzz._tcp.local" "B" 36663 {:path "/b" :q 0})
     (advertise "_airplay._tcp.local" "A" 36663 {})
