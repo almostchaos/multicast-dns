@@ -26,7 +26,7 @@
 (defn- drain-channel-sequence [channel exit]
   (lazy-seq
     (let [[item channel] (alts!! [channel exit])]
-      (when-not (nil? item)
+      (when item
         (cons item (drain-channel-sequence channel exit))))))
 
 (defn listen []
@@ -47,7 +47,7 @@
         respond (fn [service-type service-instances]
                   (run! (fn [[instance instance-port txt]]
                           (try
-                            (debug "sending response for" instance "port" instance-port)
+                            (debug "sending response for" (str instance "." service-type))
                             (send address port (ptr-answer service-type instance 0 0 instance-port txt))
                             (catch Exception e
                               (error e))))
@@ -60,15 +60,15 @@
           (run!
             (fn [service-type]
               (when-let [service-instances (get @services service-type)]
-                (respond service-type service-instances)))
+                (respond service-type (vals service-instances))))
             service-types))))
 
     {:advertise (fn [service-type service-instance port txt]
                   (swap! services update service-type
                          (fn [instances]
                            (if (nil? instances)
-                             [[service-instance port txt]]
-                             (cons [service-instance port txt] instances)))))
+                             {service-instance [service-instance port txt]}
+                             (assoc instances service-instance [service-instance port txt])))))
      :shutdown  (fn []
                   (debug "stopping...")
                   (swap! running not)
@@ -81,6 +81,8 @@
          shutdown  :shutdown} (listen)]
     (advertise "_zzzzz._tcp.local" "A" 36663 {:path "/a"})
     (advertise "_zzzzz._tcp.local" "B" 36663 {:path "/b" :q 0})
+    (advertise "_airplay._tcp.local" "A" 36663 {})
+    (advertise "_spotify-connect._tcp.local" "A" 36663 {})
     (on-term-signal
       (info "shutting down...")
       (shutdown)
