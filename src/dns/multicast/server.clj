@@ -32,7 +32,7 @@
 (defn listen []
   (let [services (atom {})
         running (atom true)
-        queried-services (async/chan 100)
+        queried-service-types (async/chan 100)
         receive (fn [_ _ packet]
                   (let [message (decode-message packet)]
                     (when (query? message)
@@ -40,7 +40,7 @@
                         (rest message)
                         (filter ptr-question?)
                         (map :QNAME)
-                        (run! (partial >!! queried-services))))))
+                        (run! (partial >!! queried-service-types))))))
 
         {send         :send
          close-socket :close} (socket address port receive)
@@ -56,7 +56,8 @@
       (info "starting to listen...")
       (while @running
         ;(debug "...")
-        (let [service-types (set (drain-channel-sequence queried-services (async/timeout 1000)))]
+        (let [timed-exit (async/timeout 1000)
+              service-types (set (drain-channel-sequence queried-service-types timed-exit))]
           (run!
             (fn [service-type]
               (when-let [service-instances (get @services service-type)]
@@ -66,14 +67,15 @@
     {:advertise (fn [service-type service-instance port txt]
                   (swap! services update service-type
                          (fn [instances]
-                           (if (nil? instances)
-                             {service-instance [service-instance port txt]}
-                             (assoc instances service-instance [service-instance port txt])))))
+                           (let [entry [service-instance port txt]]
+                             (if (nil? instances)
+                               {service-instance entry}
+                               (assoc instances service-instance entry))))))
      :shutdown  (fn []
                   (debug "stopping...")
                   (swap! running not)
                   (close-socket)
-                  (async/close! queried-services)
+                  (async/close! queried-service-types)
                   (debug "stopped listening"))}))
 
 (defn -main [& args]
