@@ -46,11 +46,13 @@
          close-socket :close} (socket address port receive)
         respond (fn [service-type service-instances]
                   (run! (fn [[instance instance-port txt]]
-                          (try
-                            (debug "sending response for" (str instance "." service-type))
-                            (send address port (ptr-answer service-type instance 0 0 instance-port txt))
-                            (catch Exception e
-                              (error e))))
+                          (async/go
+                            (Thread/sleep (long (+ 20 (rand 100))))
+                            (try
+                              (debug "sending response for" (str instance "." service-type))
+                              (send address port (ptr-answer service-type instance 0 0 instance-port txt))
+                              (catch Exception e
+                                (error e)))))
                         service-instances))]
     (future
       (info "starting to listen...")
@@ -85,6 +87,7 @@
     (advertise "_zzzzz._tcp.local" "B" 36663 {:path "/b" :q 0})
     (advertise "_airplay._tcp.local" "A" 36663 {})
     (advertise "_spotify-connect._tcp.local" "A" 36663 {})
+    (advertise "_octoprint._tcp.local" "A" 36663 {})
     (on-term-signal
       (info "shutting down...")
       (shutdown)
