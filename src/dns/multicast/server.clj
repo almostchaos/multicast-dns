@@ -47,12 +47,14 @@
         respond (fn [service-type service-instances]
                   (run! (fn [[instance instance-port txt]]
                           (async/go
-                            (Thread/sleep (long (+ 20 (rand 100))))
-                            (try
-                              (debug "sending response for" (str instance "." service-type))
-                              (send address port (ptr-answer service-type instance 0 0 instance-port txt))
-                              (catch Exception e
-                                (error e)))))
+                            (let [full-instance-name (str instance "." service-type)
+                                  random-delay (long (+ 20 (rand 100)))]
+                              (try
+                                (Thread/sleep random-delay)
+                                (debug "sending response for" full-instance-name)
+                                (send address port (ptr-answer service-type instance 0 0 instance-port txt))
+                                (catch Exception e
+                                  (error "failed to send response for" full-instance-name e))))))
                         service-instances))]
     (future
       (info "starting to listen...")
