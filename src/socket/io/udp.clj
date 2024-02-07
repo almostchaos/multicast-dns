@@ -6,17 +6,20 @@
 
 (def max-payload 508)
 
-(defn socket [address port receiver]
+(defn socket [address port receiver & {multicast :multicast}]
   "Naive implementation of UDP sockets."
 
-  (let [inet-address (InetAddress/getByName address)
-        socket-address (new InetSocketAddress inet-address port)
-        inet-socket (if (.isMulticastAddress inet-address)
-                      (let [multicast-socket (new MulticastSocket port)]
-                        (.joinGroup multicast-socket socket-address nil)
+  (let [bind-address (InetAddress/getByName address)
+        inet-socket (if multicast
+                      (let [multicast-address (InetAddress/getByName multicast)
+                            socket-address (new InetSocketAddress multicast-address port)
+                            multicast-socket (new MulticastSocket port)
+                            interface (NetworkInterface/getByInetAddress bind-address)]
+                        (.joinGroup multicast-socket socket-address interface)
                         multicast-socket)
 
-                      (new DatagramSocket socket-address))]
+                      (let [socket-address (new InetSocketAddress bind-address port)]
+                        (new DatagramSocket socket-address)))]
 
     (when-not (or (nil? address) (nil? receiver))
       (future

@@ -29,7 +29,7 @@
       (when item
         (cons item (drain-channel-sequence channel exit))))))
 
-(defn listen []
+(defn listen [bind-address]
   (let [services (atom {})
         running (atom true)
         queried-service-types (async/chan 100)
@@ -43,7 +43,7 @@
                         (run! (partial >!! queried-service-types))))))
 
         {send         :send
-         close-socket :close} (socket address port receive)
+         close-socket :close} (socket bind-address port receive :multicast address)
         respond (fn [service-type service-instances]
                   (run! (fn [[instance instance-port txt]]
                           (async/go
@@ -84,11 +84,11 @@
 
 (defn -main [& args]
   (let [{advertise :advertise
-         shutdown  :stop} (listen)]
-    (advertise "_zzzzz._tcp.local" "A" 36663 {:path "/a"})
+         shutdown  :stop} (listen "0.0.0.0")]
     (advertise "_zzzzz._tcp.local" "B" 36663 {:path "/b" :q 0})
     (advertise "_airplay._tcp.local" "A" 36663 {})
     (advertise "_spotify-connect._tcp.local" "A" 36663 {})
+    (advertise "_googlecast._tcp.local" "A" 36663 {})
     (advertise "_octoprint._tcp.local" "A" 36663 {})
     (on-term-signal
       (info "shutting down...")

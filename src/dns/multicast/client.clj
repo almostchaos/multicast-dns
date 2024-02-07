@@ -22,7 +22,7 @@
 (defn name->ip [name]
   (let [messages (async/timeout 1000)
         receive (fn [_ _ message] (>!! messages message))
-        {send :send close-socket :close} (socket address port receive)]
+        {send :send close-socket :close} (socket "192.168.0.137" port receive :multicast address)]
 
     (send address port (a-query name))
     (->
@@ -43,7 +43,7 @@
 (defn service->names [service-path]
   (let [messages (async/chan 10)
         receive (fn [_ _ message] (>!! messages message))
-        {send :send close-socket :close} (socket address port receive)]
+        {send :send close-socket :close} (socket "192.168.0.137" port receive :multicast address)]
 
     (send address port (ptr-query service-path))
     ;listen a limited time for responses
@@ -65,8 +65,8 @@
 
 (defn -main [& args]
   (run! println (service->names "_zzzzz._tcp.local"))
-  ;(Thread/sleep 1300)
-  ;(run! println (service->names "_zzz._tcp.local"))
-  ;(println (name->ip "octopi.local"))
+  (run! println (service->names "_googlecast._tcp.local"))
+  (run! println (service->names "_octoprint._tcp.local"))
+  (println (name->ip "octopi.local"))
 
   (shutdown-agents))
