@@ -30,9 +30,9 @@
         (cons item (drain-channel-sequence channel exit))))))
 
 (defn listen [bind-address]
-  (let [services (atom {})
+  (let [service-types (atom {})
         running (atom true)
-        queried-service-types (async/chan 100)
+        queried-resources (async/chan 100)
         receive (fn [_ _ packet]
                   (let [message (decode-message packet)]
                     (when (query? message)
@@ -40,38 +40,35 @@
                         (rest message)
                         (filter ptr-question?)
                         (map :QNAME)
-                        (run! (partial >!! queried-service-types))))))
+                        (run! (partial >!! queried-resources))))))
 
         {send         :send
          close-socket :close} (socket bind-address port receive :multicast address)
-        respond (fn [service-type service-instances]
-                  (run! (fn [[instance instance-port txt]]
-                          (async/go
-                            (let [full-instance-name (str instance "." service-type)
-                                  random-delay (long (+ 20 (rand 100)))]
-                              (try
-                                (Thread/sleep random-delay)
-                                (debug "sending response for" full-instance-name)
-                                (send address port (ptr-answer service-type instance 0 0 instance-port txt))
-                                (catch Exception e
-                                  (error "failed to send response for" full-instance-name e))))))
-                        service-instances))]
+        respond (fn [answer parameters]
+                  (async/go
+                    (let [random-delay (long (+ 20 (rand 100)))]
+                      (try
+                        (Thread/sleep random-delay)
+                        (debug "sending response for" parameters)
+                        (send address port (apply answer parameters))
+                        (catch Exception e
+                          (error "failed to send response for" parameters e))))))]
     (future
       (info "starting to listen...")
       (while @running
         ;(debug "...")
         (let [timed-exit (async/timeout 1000)
-              service-types (distinct (drain-channel-sequence queried-service-types timed-exit))]
+              resources (distinct (drain-channel-sequence queried-resources timed-exit))]
           (run!
-            (fn [service-type]
-              (when-let [service-instances (get @services service-type)]
-                (respond service-type (vals service-instances))))
-            service-types))))
+            (fn [resource]
+              (when-let [instances (get @service-types resource)]
+                (run! (partial respond ptr-answer) (vals instances))))
+            resources))))
 
     {:advertise (fn [service-type service-instance port txt]
-                  (swap! services update service-type
-                         (fn [instances]
-                           (let [entry [service-instance port txt]]
+                  (let [entry [service-type service-instance port txt]]
+                    (swap! service-types update service-type
+                           (fn [instances]
                              (if (nil? instances)
                                {service-instance entry}
                                (assoc instances service-instance entry))))))
@@ -79,7 +76,7 @@
                   (debug "stopping...")
                   (swap! running not)
                   (close-socket)
-                  (async/close! queried-service-types)
+                  (async/close! queried-resources)
                   (debug "stopped listening"))}))
 
 (defn -main [& args]
