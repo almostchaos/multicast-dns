@@ -12,8 +12,12 @@
 (defn- query? [message]
   (not (:QR (first message))))
 
-(defn- ptr-question? [section]
-  (= type:PTR (:QTYPE section)))
+(defn- known-question? [question]
+  (let [type (:QTYPE question)]
+    (or
+      (= type:PTR type)
+      (= type:SRV type)
+      (= type:TXT type))))
 
 (defmacro on-term-signal [& handler]
   `(.addShutdownHook
@@ -31,6 +35,7 @@
 
 (defn listen [bind-address]
   (let [service-types (atom {})
+        service-instances (atom {})
         running (atom true)
         queried-resources (async/chan 100)
         receive (fn [_ _ packet]
@@ -38,8 +43,14 @@
                     (when (query? message)
                       (->>
                         (rest message)
-                        (filter ptr-question?)
-                        (map :QNAME)
+                        (filter known-question?)
+                        (map (fn [question]
+                               (let [type (:QTYPE question)
+                                     resource (:QNAME question)]
+                                 (cond
+                                   (= type:PTR type) [ptr-answer resource]
+                                   (= type:SRV type) [srv-answer resource]
+                                   (= type:TXT type) [txt-answer resource]))))
                         (run! (partial >!! queried-resources))))))
 
         {send         :send
@@ -60,13 +71,17 @@
         (let [timed-exit (async/timeout 1000)
               resources (distinct (drain-channel-sequence queried-resources timed-exit))]
           (run!
-            (fn [resource]
-              (when-let [instances (get @service-types resource)]
-                (run! (partial respond ptr-answer) (vals instances))))
+            (fn [[answer resource]]
+              (if (= answer ptr-answer)
+                (when-let [instances (get @service-types resource)]
+                  (run! (partial respond answer) (vals instances)))
+                (when-let [instance (get @service-instances resource)]
+                  (respond answer instance))))
             resources))))
 
     {:advertise (fn [service-type service-instance port txt]
                   (let [entry [service-type service-instance port txt]]
+                    (swap! service-instances assoc (str service-instance "." service-type) entry)
                     (swap! service-types update service-type
                            (fn [instances]
                              (if (nil? instances)

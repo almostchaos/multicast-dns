@@ -120,3 +120,24 @@
       (encode-answer host type:A class:IN ttl (encode-address ip))
       (when-not (empty? txt)
         (encode-answer service-instance type:TXT class:IN ttl (encode-txt txt))))))
+
+(defn txt-answer [service-path instance port txt]
+  (let [service-name (string/split service-path #"\.")
+        service-instance (cons instance service-name)
+        ttl 120]
+    (byte-array-concat
+      (encode-header
+        :QR flag:enabled
+        :OPCODE op-code:query
+        :AA flag:disabled
+        :TC flag:disabled
+        :RD flag:disabled
+        :RA flag:disabled
+        :AD flag:disabled
+        :CD flag:disabled
+        :RCODE r-code:no-error
+        :QDCOUNT 0
+        :ANCOUNT 1
+        :NSCOUNT 0
+        :ARCOUNT 1)
+        (encode-answer service-instance type:TXT class:IN ttl (encode-txt txt)))))
