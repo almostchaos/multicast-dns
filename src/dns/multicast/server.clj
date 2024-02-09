@@ -47,10 +47,10 @@
                         (map (fn [question]
                                (let [type (:QTYPE question)
                                      resource (:QNAME question)]
-                                 (case type
-                                   type:PTR [ptr-answer resource]
-                                   type:SRV [srv-answer resource]
-                                   type:TXT [txt-answer resource]))))
+                                 (cond
+                                   (= type:PTR type) [ptr-answer resource]
+                                   (= type:SRV type) [srv-answer resource]
+                                   (= type:TXT type) [txt-answer resource]))))
                         (run! (partial >!! queried-resources))))))
 
         {send         :send
