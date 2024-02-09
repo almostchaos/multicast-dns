@@ -1,1 +1,1 @@
-Server and client library for multicast DNS service discovery.
+Multicast DNS service discovery library. DNS responding service and client querier are both implemented in Clojure.
