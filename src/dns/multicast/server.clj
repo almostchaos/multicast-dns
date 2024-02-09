@@ -47,10 +47,10 @@
                         (map (fn [question]
                                (let [type (:QTYPE question)
                                      resource (:QNAME question)]
-                                 (cond
-                                   (= type:PTR type) [ptr-answer resource]
-                                   (= type:SRV type) [srv-answer resource]
-                                   (= type:TXT type) [txt-answer resource]))))
+                                 (case type
+                                   type:PTR [ptr-answer resource]
+                                   type:SRV [srv-answer resource]
+                                   type:TXT [txt-answer resource]))))
                         (run! (partial >!! queried-resources))))))
 
         {send         :send
@@ -100,7 +100,7 @@
     (advertise "_zzzzz._tcp.local" "B" 36663 {:path "/b" :q 0})
     (advertise "_airplay._tcp.local" "A" 36663 {})
     (advertise "_spotify-connect._tcp.local" "A" 36663 {})
-    (advertise "_googlecast._tcp.local" "A" 36663 {})
+    (advertise "_googlecast._tcp.local" "A" 36663 {:a 1 :b 2 :c "three"})
     (advertise "_octoprint._tcp.local" "A" 36663 {})
     (on-term-signal
       (info "shutting down...")
