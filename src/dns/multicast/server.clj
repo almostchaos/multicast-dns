@@ -35,7 +35,7 @@
         (cons item (drain-channel-sequence channel exit))))))
 
 (defn listen [bind-address]
-  (let [registered-resources (atom {})
+  (let [registered-resources (atom nil)
         running (atom true)
         queried-resources (async/chan 100)
         receive (fn [_ _ packet]
@@ -73,7 +73,8 @@
               resources (distinct (drain-channel-sequence queried-resources timed-exit))]
           (run!
             (fn [[answer queried-resource]]
-              (let [resource-match? (fn [[name _]] (string/ends-with? name queried-resource))
+              (let [resource-match? (fn [[name _]]
+                                      (string/ends-with? name queried-resource))
                     matching-resources (filter resource-match? @registered-resources)]
                 (run! (fn [[_ parameters]]
                         (respond answer parameters)) matching-resources))) resources))))
@@ -81,7 +82,7 @@
     {:advertise (fn [service-type service-instance port txt]
                   (let [name (str service-instance "." service-type)
                         parameters [service-type service-instance port txt]]
-                    (swap! registered-resources assoc name parameters)))
+                    (swap! registered-resources conj [name parameters])))
      :stop      (fn []
                   (debug "stopping...")
                   (swap! running not)
