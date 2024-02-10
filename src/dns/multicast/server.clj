@@ -1,6 +1,7 @@
 (ns dns.multicast.server
   (:require
     [clojure.core.async :as async :refer [>!! alts!!]]
+    [clojure.string :as string]
     [dns.encoding :refer :all]
     [dns.message :refer :all]
     [socket.io.udp :refer [socket]]
@@ -34,8 +35,7 @@
         (cons item (drain-channel-sequence channel exit))))))
 
 (defn listen [bind-address]
-  (let [service-types (atom {})
-        service-instances (atom {})
+  (let [registered-resources (atom {})
         running (atom true)
         queried-resources (async/chan 100)
         receive (fn [_ _ packet]
@@ -66,27 +66,22 @@
                           (error "failed to send response for" parameters e))))))]
     (future
       (info "starting to listen...")
+
       (while @running
         ;(debug "...")
         (let [timed-exit (async/timeout 1000)
               resources (distinct (drain-channel-sequence queried-resources timed-exit))]
           (run!
-            (fn [[answer resource]]
-              (if (= answer ptr-answer)
-                (when-let [instances (get @service-types resource)]
-                  (run! (partial respond answer) (vals instances)))
-                (when-let [instance (get @service-instances resource)]
-                  (respond answer instance))))
-            resources))))
+            (fn [[answer queried-resource]]
+              (let [resource-match? (fn [[name _]] (string/ends-with? name queried-resource))
+                    matching-resources (filter resource-match? @registered-resources)]
+                (run! (fn [[_ parameters]]
+                        (respond answer parameters)) matching-resources))) resources))))
 
     {:advertise (fn [service-type service-instance port txt]
-                  (let [entry [service-type service-instance port txt]]
-                    (swap! service-instances assoc (str service-instance "." service-type) entry)
-                    (swap! service-types update service-type
-                           (fn [instances]
-                             (if (nil? instances)
-                               {service-instance entry}
-                               (assoc instances service-instance entry))))))
+                  (let [name (str service-instance "." service-type)
+                        parameters [service-type service-instance port txt]]
+                    (swap! registered-resources assoc name parameters)))
      :stop      (fn []
                   (debug "stopping...")
                   (swap! running not)
@@ -101,6 +96,7 @@
     (advertise "_airplay._tcp.local" "A" 36663 {})
     (advertise "_spotify-connect._tcp.local" "A" 36663 {})
     (advertise "_googlecast._tcp.local" "A" 36663 {:a 1 :b 2 :c "three"})
+    (advertise "_googlecast._tcp.local" "B" 663 {})
     (advertise "_octoprint._tcp.local" "A" 36663 {})
     (on-term-signal
       (info "shutting down...")
