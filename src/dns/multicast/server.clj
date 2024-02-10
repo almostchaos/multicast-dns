@@ -68,13 +68,11 @@
       (info "starting to listen...")
 
       (while @running
-        ;(debug "...")
         (let [timed-exit (async/timeout 1000)
               resources (distinct (drain-channel-sequence queried-resources timed-exit))]
           (run!
             (fn [[answer queried-resource]]
-              (let [resource-match? (fn [[name _]]
-                                      (string/ends-with? name queried-resource))
+              (let [resource-match? (fn [[name _]] (string/ends-with? name queried-resource))
                     matching-resources (filter resource-match? @registered-resources)]
                 (run! (fn [[_ parameters]]
                         (respond answer parameters)) matching-resources))) resources))))
