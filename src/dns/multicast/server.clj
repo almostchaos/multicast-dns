@@ -5,7 +5,8 @@
     [dns.encoding :refer :all]
     [dns.message :refer :all]
     [socket.io.udp :refer [socket]]
-    [taoensso.timbre :refer [debug error info]]))
+    [taoensso.timbre :refer [debug error info]]
+    [tick.core :as t]))
 
 (def port 5353)
 (def address "224.0.0.251")
@@ -69,18 +70,24 @@
 
       (while @running
         (let [timed-exit (async/timeout 1000)
-              resources (distinct (drain-channel-sequence queried-resources timed-exit))]
+              resources (distinct (drain-channel-sequence queried-resources timed-exit))
+              now (t/instant)
+              valid? (fn [[_ _ expiry]] (t/< now expiry))
+              valid-registered-resources (filter valid? @registered-resources)]
           (run!
             (fn [[answer queried-resource]]
-              (let [resource-match? (fn [[name _]] (string/ends-with? name queried-resource))
-                    matching-resources (filter resource-match? @registered-resources)]
-                (run! (fn [[_ parameters]]
-                        (respond answer parameters)) matching-resources))) resources))))
+              (let [resource-match? (fn [[name _ _]] (string/ends-with? name queried-resource))
+                    matching-resources (filter resource-match? valid-registered-resources)]
+                (run! (fn [[_ parameters _]]
+                        (respond answer parameters)) matching-resources))) resources)
 
-    {:advertise (fn [service-type service-instance port txt]
+          (reset! registered-resources valid-registered-resources))))
+
+    {:advertise (fn [service-type service-instance port & {txt :txt ttl :ttl}]
                   (let [name (str service-instance "." service-type)
-                        parameters [service-type service-instance port txt]]
-                    (swap! registered-resources conj [name parameters])))
+                        parameters [service-type service-instance port txt]
+                        expiry (t/>> (t/instant) (t/new-duration (or ttl 120) :seconds))]
+                    (swap! registered-resources conj [name parameters expiry])))
      :stop      (fn []
                   (debug "stopping...")
                   (swap! running not)
@@ -91,12 +98,12 @@
 (defn -main [& args]
   (let [{advertise :advertise
          shutdown  :stop} (listen "0.0.0.0")]
-    (advertise "_zzzzz._tcp.local" "B" 36663 {:path "/b" :q 0})
-    (advertise "_airplay._tcp.local" "A" 36663 {})
-    (advertise "_spotify-connect._tcp.local" "A" 36663 {})
-    (advertise "_googlecast._tcp.local" "A" 36663 {:a 1 :b 2 :c "three"})
-    (advertise "_googlecast._tcp.local" "B" 663 {})
-    (advertise "_octoprint._tcp.local" "A" 36663 {})
+    (advertise "_zzzzz._tcp.local" "B" 36663 :txt {:path "/b" :q 0} :ttl 20)
+    (advertise "_airplay._tcp.local" "A" 36663 :ttl 20)
+    (advertise "_spotify-connect._tcp.local" "A" 36663)
+    (advertise "_googlecast._tcp.local" "A" 36663 :txt {:a 1 :b 2 :c "three"})
+    (advertise "_googlecast._tcp.local" "B" 663)
+    (advertise "_octoprint._tcp.local" "A" 36663)
     (on-term-signal
       (info "shutting down...")
       (shutdown)
