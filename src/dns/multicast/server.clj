@@ -39,6 +39,7 @@
   (let [registered-resources (atom nil)
         running (atom true)
         queried-resources (async/chan 100)
+
         receive (fn [_ _ packet]
                   (let [message (decode-message packet)]
                     (when (query? message)
@@ -54,8 +55,10 @@
                                    (= type:TXT type) [txt-answer resource]))))
                         (run! (partial >!! queried-resources))))))
 
+
         {send         :send
          close-socket :close} (socket bind-address port receive :multicast address)
+
         respond (fn [answer parameters]
                   (async/go
                     (let [random-delay (long (+ 20 (rand 100)))]
@@ -64,9 +67,23 @@
                         (debug "sending response for" parameters)
                         (send address port (apply answer parameters))
                         (catch Exception e
-                          (error "failed to send response for" parameters e))))))]
+                          (error "failed to respond to query" parameters e))))))
+
+        advertise (fn [service-type service-instance port & {txt :txt ttl :ttl}]
+                    (let [name (str service-instance "." service-type)
+                          parameters [service-type service-instance port txt]
+                          one-year (* 365 24 60 60)
+                          expiry (t/>> (t/instant) (t/new-duration (or ttl one-year) :seconds))]
+                      (swap! registered-resources conj [name parameters expiry])))
+
+        stop (fn []
+               (debug "stopping...")
+               (swap! running not)
+               (close-socket)
+               (async/close! queried-resources)
+               (debug "stopped listening"))]
     (future
-      (info "starting to listen...")
+      (info "listening...")
 
       (while @running
         (let [timed-exit (async/timeout 1000)
@@ -83,17 +100,7 @@
 
           (reset! registered-resources valid-registered-resources))))
 
-    {:advertise (fn [service-type service-instance port & {txt :txt ttl :ttl}]
-                  (let [name (str service-instance "." service-type)
-                        parameters [service-type service-instance port txt]
-                        expiry (t/>> (t/instant) (t/new-duration (or ttl 120) :seconds))]
-                    (swap! registered-resources conj [name parameters expiry])))
-     :stop      (fn []
-                  (debug "stopping...")
-                  (swap! running not)
-                  (close-socket)
-                  (async/close! queried-resources)
-                  (debug "stopped listening"))}))
+    {:advertise advertise :stop stop}))
 
 (defn -main [& args]
   (let [{advertise :advertise
