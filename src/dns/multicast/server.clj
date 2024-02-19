@@ -92,15 +92,14 @@
               now (t/instant)
               valid? (fn [[_ _ expiry]] (t/< now expiry))
               valid-registered-resources (filter valid? @registered-resources)]
-          (run!
-            (fn [[answer queried-resource]]
-              (let [resource-match? (fn [[name _ _]] (string/ends-with? name queried-resource))
-                    matching-resources (filter resource-match? valid-registered-resources)]
-                (run! (fn [[_ parameters expiry]]
-                        (let [ttl (t/seconds (t/between now expiry))
-                              current-parameters (conj parameters :ttl ttl)]
-                          (respond answer current-parameters))) matching-resources)))
-            resources)
+          (run! (fn [[answer queried-resource]]
+                  (let [resource-match? (fn [[name _ _]] (string/ends-with? name queried-resource))
+                        matching-resources (filter resource-match? valid-registered-resources)]
+                    (run! (fn [[_ parameters expiry]]
+                            (let [answer-ttl (t/seconds (t/between now expiry))
+                                  current-parameters (conj parameters :ttl answer-ttl)]
+                              (respond answer current-parameters))) matching-resources)))
+                resources)
 
           (reset! registered-resources valid-registered-resources))))
 
