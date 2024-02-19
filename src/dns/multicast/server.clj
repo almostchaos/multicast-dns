@@ -62,10 +62,11 @@
 
         respond (fn [answer parameters]
                   (async/go
-                    (let [random-delay (long (+ 20 (rand 100)))]
+                    (let [random-delay (long (+ 20 (rand 100)))
+                          [type name] parameters]
                       (try
                         (Thread/sleep random-delay)
-                        (debug "sending response for" parameters)
+                        (debug "sending response for" (str name "." type))
                         (send address port (apply answer parameters))
                         (catch Exception e
                           (error "failed to respond to query" parameters e))))))
