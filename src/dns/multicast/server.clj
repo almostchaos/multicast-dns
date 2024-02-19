@@ -69,7 +69,7 @@
                         (debug "sending response for" (str name "." type))
                         (send address port (apply answer parameters))
                         (catch Exception e
-                          (error "failed to respond to query" parameters e))))))
+                          (error "failed to respond to query," (.getMessage e)))))))
 
         advertise (fn [service-type service-instance host port & {txt :txt ttl :ttl}]
                     (let [name (str service-instance "." service-type)
@@ -89,18 +89,20 @@
 
       (while @running
         (let [timed-exit (async/timeout 1000)
-              resources (distinct (drain-channel-sequence queried-resources timed-exit))
               now (t/instant)
               valid? (fn [[_ _ expiry]] (t/< now expiry))
               valid-registered-resources (filter valid? @registered-resources)]
-          (run! (fn [[answer queried-resource]]
-                  (let [resource-match? (fn [[name _ _]] (string/ends-with? name queried-resource))
-                        matching-resources (filter resource-match? valid-registered-resources)]
-                    (run! (fn [[_ parameters expiry]]
-                            (let [answer-ttl (t/seconds (t/between now expiry))
-                                  current-parameters (conj parameters :ttl answer-ttl)]
-                              (respond answer current-parameters))) matching-resources)))
-                resources)
+          (->>
+            (distinct (drain-channel-sequence queried-resources timed-exit))
+            (run! (fn [[answer queried-resource]]
+                    (->>
+                      valid-registered-resources
+                      (filter (fn [[name _ _]]
+                                (string/ends-with? name queried-resource)))
+                      (run! (fn [[_ parameters expiry]]
+                              (let [answer-ttl (t/seconds (t/between now expiry))
+                                    current-parameters (conj parameters :ttl answer-ttl)]
+                                (respond answer current-parameters))))))))
 
           (reset! registered-resources valid-registered-resources))))
 
