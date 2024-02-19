@@ -6,7 +6,8 @@
     [dns.message :refer :all]
     [socket.io.udp :refer [socket]]
     [taoensso.timbre :refer [debug error info]]
-    [tick.core :as t]))
+    [tick.core :as t])
+  (:import (java.net InetAddress)))
 
 (def port 5353)
 (def address "224.0.0.251")
@@ -69,9 +70,9 @@
                         (catch Exception e
                           (error "failed to respond to query" parameters e))))))
 
-        advertise (fn [service-type service-instance port & {txt :txt ttl :ttl}]
+        advertise (fn [service-type service-instance host port & {txt :txt ttl :ttl}]
                     (let [name (str service-instance "." service-type)
-                          parameters [service-type service-instance port txt]
+                          parameters [service-type service-instance :host host :port port :txt txt]
                           one-year (* 365 24 60 60)
                           expiry (t/>> (t/instant) (t/new-duration (or ttl one-year) :seconds))]
                       (swap! registered-resources conj [name parameters expiry])))
@@ -95,22 +96,25 @@
             (fn [[answer queried-resource]]
               (let [resource-match? (fn [[name _ _]] (string/ends-with? name queried-resource))
                     matching-resources (filter resource-match? valid-registered-resources)]
-                (run! (fn [[_ parameters _]]
-                        (respond answer parameters)) matching-resources))) resources)
+                (run! (fn [[_ parameters expiry]]
+                        (let [ttl (t/seconds (t/between now expiry))
+                              current-parameters (conj parameters :ttl ttl)]
+                          (respond answer current-parameters))) matching-resources)))
+            resources)
 
           (reset! registered-resources valid-registered-resources))))
 
     {:advertise advertise :stop stop}))
 
 (defn -main [& args]
-  (let [{advertise :advertise
-         shutdown  :stop} (listen "0.0.0.0")]
-    (advertise "_zzzzz._tcp.local" "B" 36663 :txt {:path "/b" :q 0} :ttl 20)
-    (advertise "_airplay._tcp.local" "A" 36663 :ttl 20)
-    (advertise "_spotify-connect._tcp.local" "A" 36663)
-    (advertise "_googlecast._tcp.local" "A" 36663 :txt {:a 1 :b 2 :c "three"})
-    (advertise "_googlecast._tcp.local" "B" 663)
-    (advertise "_octoprint._tcp.local" "A" 36663)
+  (let [{advertise :advertise shutdown :stop} (listen "0.0.0.0")
+        host (.getHostName (InetAddress/getLocalHost))]
+    (advertise "_zzzzz._tcp.local" "B" host 36663 :txt {:path "/b" :q 0} :ttl 200)
+    (advertise "_airplay._tcp.local" "A" host 36663 :ttl 360)
+    (advertise "_spotify-connect._tcp.local" "A" host 36663)
+    (advertise "_googlecast._tcp.local" "A" host 36663 :txt {:a 1 :b 2 :c "three"})
+    (advertise "_googlecast._tcp.local" "B" host 663 :ttl 120)
+    (advertise "_octoprint._tcp.local" "A" host 36663 :txt {:bla 123})
     (on-term-signal
       (info "shutting down...")
       (shutdown)
