@@ -195,6 +195,8 @@
 (defn- decode-address [start message]
   (string/join "." (map byte->long (take 4 (drop start message)))))
 
+(defn- kv->tuple [kv] (string/split kv #"={1}"))
+
 (defn- decode-txt [start length message]
   (let [data (take length (drop start message))
         texts (loop [input data
@@ -203,14 +205,11 @@
                       part (take part-length (drop 1 input))
                       txt (to-string (byte-array part))
                       input-rest (drop (+ 1 part-length) input)
-                      current-result (cons txt result)]
+                      result-partial (cons txt result)]
                   (if (empty? input-rest)
-                    current-result
-                    (recur input-rest current-result))))
-        kv-tuple (fn [txt] (string/split txt #"={1}"))]
-    (apply array-map
-           (flatten
-             (map kv-tuple texts)))))
+                    result-partial
+                    (recur input-rest result-partial))))]
+    (apply array-map (flatten (map kv->tuple texts)))))
 
 (defn- name-storage-size [start message]
   (if (> (alength message) start)
