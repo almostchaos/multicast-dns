@@ -11,6 +11,7 @@
 (defn- resource-type-matcher [type] (fn [section] (= type (:TYPE section))))
 (def match-ptr (resource-type-matcher type:PTR))
 (def match-a (resource-type-matcher type:A))
+(def match-srv (resource-type-matcher type:SRV))
 
 (defn- drain-channel-sequence [channel end]
   (lazy-seq
@@ -57,11 +58,11 @@
         (filter
           (fn [message]
             (and
-              (some match-a message)
+              (some match-ptr message)
               (= service-path (-> (filter match-ptr message) (first) (:NAME))))))
         (map
           (fn [message]
-            (-> (filter match-a message) (first) (:NAME))))))))
+            (-> (filter match-srv message) (first) (:NAME))))))))
 
 (defn -main [& args]
   (run! println (service->names "_zzzzz._tcp.local"))
