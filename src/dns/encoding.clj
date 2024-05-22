@@ -197,19 +197,20 @@
 
 (defn- decode-txt [start length message]
   (let [data (take length (drop start message))
-        txts (loop [input data
-                    result nil]
-               (let [part-length (first input)
-                     part (take part-length (drop 1 input))
-                     txt (to-string (byte-array part))
-                     rest (drop (+ 1 part-length) input)]
-                 (if (empty? rest)
-                   (cons txt result)
-                   (recur rest (cons txt result)))))]
+        texts (loop [input data
+                     result nil]
+                (let [part-length (first input)
+                      part (take part-length (drop 1 input))
+                      txt (to-string (byte-array part))
+                      input-rest (drop (+ 1 part-length) input)
+                      current-result (cons txt result)]
+                  (if (empty? input-rest)
+                    current-result
+                    (recur input-rest current-result))))
+        kv-tuple (fn [txt] (string/split txt #"={1}"))]
     (apply array-map
            (flatten
-             (map (fn [txt]
-                    (string/split txt #"={1}")) txts)))))
+             (map kv-tuple texts)))))
 
 (defn- name-storage-size [start message]
   (if (> (alength message) start)
