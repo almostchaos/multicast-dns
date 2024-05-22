@@ -192,6 +192,25 @@
            (decode-name next-start message (concat path [label])))))
      path)))
 
+(defn- decode-address [start message]
+  (string/join "." (map byte->long (take 4 (drop start message)))))
+
+(defn- decode-txt [start length message]
+  (let [data (take length (drop start message))
+        txts (loop [input data
+                    result nil]
+               (let [part-length (first input)
+                     part (take part-length (drop 1 input))
+                     txt (to-string (byte-array part))
+                     rest (drop (+ 1 part-length) input)]
+                 (if (empty? rest)
+                   (cons txt result)
+                   (recur rest (cons txt result)))))]
+    (apply array-map
+           (flatten
+             (map (fn [txt]
+                    (string/split txt #"={1}")) txts)))))
+
 (defn- name-storage-size [start message]
   (if (> (alength message) start)
     (loop [position start count 0]
@@ -207,8 +226,8 @@
     (= type type:PTR) (decode-name start message)
     (= type type:NSEC) (decode-name start message)
     (= type type:CNAME) (decode-name start message)
-    (= type type:A) (string/join "." (map byte->long (take 4 (drop start message))))
-    (= type type:TXT) (to-string (byte-array (take length (drop start message))))
+    (= type type:A) (decode-address start message)
+    (= type type:TXT) (decode-txt start length message)
     :else (byte-array (take length (drop start message)))))
 
 (defn- decode-sections [position message question-count answer-count]
