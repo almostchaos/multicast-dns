@@ -67,9 +67,9 @@
         :NSCOUNT 0
         :ARCOUNT (if (empty? txt) 1 2))
       (encode-answer service-name type:PTR class:IN ttl (encode-name service-instance))
-      (encode-answer service-instance type:SRV class:IN ttl (encode-srv host port priority weight))
+      (encode-answer service-instance type:SRV class:IN ttl (encode-srv-data host port priority weight))
       (when-not (empty? txt)
-        (encode-answer service-instance type:TXT class:IN ttl (encode-txt txt))))))
+        (encode-answer service-instance type:TXT class:IN ttl (encode-txt-data txt))))))
 
 (defn srv-answer [service-path instance & {hostname :host port :port txt :txt time-to-live :ttl}]
   (let [priority 0
@@ -93,9 +93,9 @@
         :ANCOUNT 1
         :NSCOUNT 0
         :ARCOUNT (if (empty? txt) 0 1))
-      (encode-answer service-instance type:SRV class:IN ttl (encode-srv host port priority weight))
+      (encode-answer service-instance type:SRV class:IN ttl (encode-srv-data host port priority weight))
       (when-not (empty? txt)
-        (encode-answer service-instance type:TXT class:IN ttl (encode-txt txt))))))
+        (encode-answer service-instance type:TXT class:IN ttl (encode-txt-data txt))))))
 
 (defn txt-answer [service-path instance & {txt :txt time-to-live :ttl}]
   (if (empty? txt)
@@ -118,4 +118,4 @@
           :ANCOUNT 1
           :NSCOUNT 0
           :ARCOUNT 1)
-        (encode-answer service-instance type:TXT class:IN ttl (encode-txt txt))))))
+        (encode-answer service-instance type:TXT class:IN ttl (encode-txt-data txt))))))

@@ -117,6 +117,19 @@
            path))
     [0]))
 
+(defn encode-address-data [ip]
+  (byte-array (->> ip (map parse-long) (map long->byte))))
+
+(defn encode-srv-data [host port priority weight]
+  (let [[priority-ms priority-ls] (drop 6 (long->byte-array priority))
+        [weight-ms weight-ls] (drop 6 (long->byte-array weight))
+        [port-ms port-ls] (drop 6 (long->byte-array port))]
+    (byte-array-concat
+      [priority-ms priority-ls
+       weight-ms weight-ls
+       port-ms port-ls]
+      (encode-name host))))
+
 (defn encode-txt-data [properties]
   (byte-array
     (flatten
@@ -126,9 +139,6 @@
                  (long->byte (count property))
                  (to-byte-array property))))
            properties))))
-
-(defn encode-address-data [ip]
-  (byte-array (->> ip (map parse-long) (map long->byte))))
 
 (defn encode-answer [service type class ttl data]
   (let [rd-length (alength data)
@@ -144,16 +154,6 @@
        ttl-3 ttl-2 ttl-1 ttl-0
        rd-length-ms rd-length-ls]
       data)))
-
-(defn encode-srv-data [host port priority weight]
-  (let [[priority-ms priority-ls] (drop 6 (long->byte-array priority))
-        [weight-ms weight-ls] (drop 6 (long->byte-array weight))
-        [port-ms port-ls] (drop 6 (long->byte-array port))]
-    (byte-array-concat
-      [priority-ms priority-ls
-       weight-ms weight-ls
-       port-ms port-ls]
-      (encode-name host))))
 
 (defn- decode-header [header-bytes]
   (let [[id-ms id-ls
@@ -205,7 +205,7 @@
 (defn- decode-address-data [start message]
   (string/join "." (map byte->long (take 4 (drop start message)))))
 
-(defn decode-srv-data [start message]
+(defn- decode-srv-data [start message]
   (let [data (drop start message)
         priority (byte-array->long (take 2 data))
         weight (byte-array->long (take 2 (drop 2 data)))
