@@ -145,6 +145,16 @@
        rd-length-ms rd-length-ls]
       data)))
 
+(defn encode-srv [host port priority weight]
+  (let [[priority-ms priority-ls] (drop 6 (long->byte-array priority))
+        [weight-ms weight-ls] (drop 6 (long->byte-array weight))
+        [port-ms port-ls] (drop 6 (long->byte-array port))]
+    (byte-array-concat
+      [priority-ms priority-ls
+       weight-ms weight-ls
+       port-ms port-ls]
+      (encode-name host))))
+
 (defn- decode-header [header-bytes]
   (let [[id-ms id-ls
          flags-first flags-second

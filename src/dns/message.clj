@@ -49,10 +49,8 @@
         service-name (split service-path dot)
         service-instance (cons instance service-name)
         host (split hostname dot)
-        ttl (or time-to-live 120)
-        [priority-ms priority-ls] (drop 6 (long->byte-array priority))
-        [weight-ms weight-ls] (drop 6 (long->byte-array weight))
-        [port-ms port-ls] (drop 6 (long->byte-array port))]
+        ttl (or time-to-live 120)]
+
     (byte-array-concat
       (encode-header
         :QR flag:enabled
@@ -69,12 +67,7 @@
         :NSCOUNT 0
         :ARCOUNT (if (empty? txt) 1 2))
       (encode-answer service-name type:PTR class:IN ttl (encode-name service-instance))
-      (encode-answer service-instance type:SRV class:IN ttl
-                     (byte-array-concat
-                       [priority-ms priority-ls
-                        weight-ms weight-ls
-                        port-ms port-ls]
-                       (encode-name host)))
+      (encode-answer service-instance type:SRV class:IN ttl (encode-srv host port priority weight))
       (when-not (empty? txt)
         (encode-answer service-instance type:TXT class:IN ttl (encode-txt txt))))))
 
@@ -84,10 +77,7 @@
         service-name (split service-path dot)
         service-instance (cons instance service-name)
         host (split hostname dot)
-        ttl (or time-to-live 120)
-        [priority-ms priority-ls] (drop 6 (long->byte-array priority))
-        [weight-ms weight-ls] (drop 6 (long->byte-array weight))
-        [port-ms port-ls] (drop 6 (long->byte-array port))]
+        ttl (or time-to-live 120)]
     (byte-array-concat
       (encode-header
         :QR flag:enabled
@@ -103,12 +93,7 @@
         :ANCOUNT 1
         :NSCOUNT 0
         :ARCOUNT (if (empty? txt) 0 1))
-      (encode-answer service-instance type:SRV class:IN ttl
-                     (byte-array-concat
-                       [priority-ms priority-ls
-                        weight-ms weight-ls
-                        port-ms port-ls]
-                       (encode-name host)))
+      (encode-answer service-instance type:SRV class:IN ttl (encode-srv host port priority weight))
       (when-not (empty? txt)
         (encode-answer service-instance type:TXT class:IN ttl (encode-txt txt))))))
 
