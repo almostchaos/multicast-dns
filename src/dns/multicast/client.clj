@@ -20,7 +20,7 @@
         (do (end) nil)
         (cons item (drain-channel-sequence channel end))))))
 
-(defn- query->answers [message]
+(defn- query->answers [message & {timeout :timeout}]
   (let [messages (async/chan 10)
         receive (fn [_ _ message] (>!! messages message))
         {send :send close-socket :close} (socket "0.0.0.0" port receive :multicast address)]
@@ -28,16 +28,16 @@
     (send address port message)
     ;listen a limited time for responses
     (future
-      (Thread/sleep 2000)
+      (Thread/sleep ^long (if timeout (* timeout 1000) 2000))
       (async/close! messages))
     (->>
       (drain-channel-sequence messages close-socket)
       (map decode-message))))
 
-(defn name->ip [name]
+(defn name->ip [name & {timeout :timeout}]
   (->
     (->>
-      (query->answers (a-query name))
+      (query->answers (a-query name) :timeout timeout)
       (filter
         (fn [message]
           (= name (-> (filter match-a message) first :NAME))))
@@ -47,10 +47,10 @@
     to-array
     first))
 
-(defn service->names [service-path]
+(defn service->names [service-path & {timeout :timeout}]
   (set
     (->>
-      (query->answers (ptr-query service-path))
+      (query->answers (ptr-query service-path) :timeout timeout)
       (filter
         (fn [message]
           (and
@@ -58,11 +58,11 @@
             (= service-path (-> (filter match-ptr message) first :NAME)))))
       (map
         (fn [message]
-          (-> (filter match-srv message) first))))))
+          (-> (filter match-srv message) first :NAME))))))
 
 (defn -main [& args]
   (run! println (service->names "_zzzzz._tcp.local"))
-  (run! println (service->names "_googlecast._tcp.local"))
+  (run! println (service->names "_googlecast._tcp.local" :timeout 5))
   (run! println (service->names "_octoprint._tcp.local"))
   (println (name->ip "octopi.local"))
 
