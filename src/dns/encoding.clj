@@ -205,6 +205,14 @@
 (defn- decode-address [start message]
   (string/join "." (map byte->long (take 4 (drop start message)))))
 
+(defn decode-srv [start message]
+  (let [data (drop start message)
+        priority (byte-array->long (take 2 data))
+        weight (byte-array->long (take 2 (drop 2 data)))
+        port (byte-array->long (take 2 (drop 4 data)))
+        host (decode-name (+ start 6) message)]
+    {:priority priority :weight weight :port port :host host}))
+
 (defn- kv->tuple [kv] (string/split kv #"={1}"))
 
 (defn- decode-txt [start length message]
@@ -234,6 +242,7 @@
 (defn- decode-data [type start length message]
   (cond
     (= type type:PTR) (decode-name start message)
+    (= type type:SRV) (decode-srv start message)
     (= type type:NSEC) (decode-name start message)
     (= type type:CNAME) (decode-name start message)
     (= type type:A) (decode-address start message)
