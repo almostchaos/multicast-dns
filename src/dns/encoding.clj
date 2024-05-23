@@ -117,7 +117,7 @@
            path))
     [0]))
 
-(defn encode-txt [properties]
+(defn encode-txt-data [properties]
   (byte-array
     (flatten
       (map (fn [[key value]]
@@ -127,7 +127,7 @@
                  (to-byte-array property))))
            properties))))
 
-(defn encode-address [ip]
+(defn encode-address-data [ip]
   (byte-array (->> ip (map parse-long) (map long->byte))))
 
 (defn encode-answer [service type class ttl data]
@@ -145,7 +145,7 @@
        rd-length-ms rd-length-ls]
       data)))
 
-(defn encode-srv [host port priority weight]
+(defn encode-srv-data [host port priority weight]
   (let [[priority-ms priority-ls] (drop 6 (long->byte-array priority))
         [weight-ms weight-ls] (drop 6 (long->byte-array weight))
         [port-ms port-ls] (drop 6 (long->byte-array port))]
@@ -202,10 +202,10 @@
            (decode-name next-start message (concat path [label])))))
      path)))
 
-(defn- decode-address [start message]
+(defn- decode-address-data [start message]
   (string/join "." (map byte->long (take 4 (drop start message)))))
 
-(defn decode-srv [start message]
+(defn decode-srv-data [start message]
   (let [data (drop start message)
         priority (byte-array->long (take 2 data))
         weight (byte-array->long (take 2 (drop 2 data)))
@@ -215,7 +215,7 @@
 
 (defn- kv->tuple [kv] (string/split kv #"={1}"))
 
-(defn- decode-txt [start length message]
+(defn- decode-txt-data [start length message]
   (let [data (take length (drop start message))
         texts (loop [input data
                      result nil]
@@ -242,11 +242,11 @@
 (defn- decode-data [type start length message]
   (cond
     (= type type:PTR) (decode-name start message)
-    (= type type:SRV) (decode-srv start message)
+    (= type type:SRV) (decode-srv-data start message)
     (= type type:NSEC) (decode-name start message)
     (= type type:CNAME) (decode-name start message)
-    (= type type:A) (decode-address start message)
-    (= type type:TXT) (decode-txt start length message)
+    (= type type:A) (decode-address-data start message)
+    (= type type:TXT) (decode-txt-data start length message)
     :else (byte-array (take length (drop start message)))))
 
 (defn- decode-sections [position message question-count answer-count]
