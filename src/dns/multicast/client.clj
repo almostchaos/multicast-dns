@@ -20,49 +20,45 @@
         (do (end) nil)
         (cons item (drain-channel-sequence channel end))))))
 
-(defn name->ip [name]
-  (let [messages (async/timeout 1000)
-        receive (fn [_ _ message] (>!! messages message))
-        {send :send close-socket :close} (socket "0.0.0.0" port receive :multicast address)]
-
-    (send address port (a-query name))
-    (->
-      (->>
-        (drain-channel-sequence messages close-socket)
-        (map decode-message)
-        (filter
-          (fn [message]
-            (= name (-> (filter match-a message) (first) (:NAME)))))
-        (map
-          (fn [message]
-            ;close channel as soon as first match is acquired
-            (async/close! messages)
-            (-> (filter match-a message) first :RDATA))))
-      (to-array)
-      (first))))
-
-(defn service->names [service-path]
+(defn- query->answers [message]
   (let [messages (async/chan 10)
         receive (fn [_ _ message] (>!! messages message))
         {send :send close-socket :close} (socket "0.0.0.0" port receive :multicast address)]
 
-    (send address port (ptr-query service-path))
+    (send address port message)
     ;listen a limited time for responses
     (future
       (Thread/sleep 2000)
       (async/close! messages))
-    (set
-      (->>
-        (drain-channel-sequence messages close-socket)
-        (map decode-message)
-        (filter
-          (fn [message]
-            (and
-              (some match-ptr message)
-              (= service-path (-> (filter match-ptr message) (first) (:NAME))))))
-        (map
-          (fn [message]
-            (-> (filter match-srv message) (first) (:NAME))))))))
+    (->>
+      (drain-channel-sequence messages close-socket)
+      (map decode-message))))
+
+(defn name->ip [name]
+  (->
+    (->>
+      (query->answers (a-query name))
+      (filter
+        (fn [message]
+          (= name (-> (filter match-a message) first :NAME))))
+      (map
+        (fn [message]
+          (-> (filter match-a message) first :RDATA))))
+    to-array
+    first))
+
+(defn service->names [service-path]
+  (set
+    (->>
+      (query->answers (ptr-query service-path))
+      (filter
+        (fn [message]
+          (and
+            (some match-ptr message)
+            (= service-path (-> (filter match-ptr message) first :NAME)))))
+      (map
+        (fn [message]
+          (-> (filter match-srv message) first))))))
 
 (defn -main [& args]
   (run! println (service->names "_zzzzz._tcp.local"))
