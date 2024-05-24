@@ -36,29 +36,28 @@
 
 (defn name->ip [name & {timeout :timeout}]
   (->
-    (->>
-      (query->answers (a-query name) :timeout timeout)
-      (filter
-        (fn [message]
-          (= name (-> (filter match-a message) first :NAME))))
-      (map
-        (fn [message]
-          (-> (filter match-a message) first :RDATA))))
+    (->> (query->answers (a-query name) :timeout timeout)
+         (filter
+           (fn [message]
+             (= name (-> (filter match-a message) first :NAME))))
+         (map
+           (fn [message]
+             (-> (filter match-a message) first :RDATA))))
     to-array
     first))
 
 (defn service->names [service-path & {timeout :timeout}]
-  (set
-    (->>
-      (query->answers (ptr-query service-path) :timeout timeout)
-      (filter
-        (fn [message]
-          (and
-            (some match-ptr message)
-            (= service-path (-> (filter match-ptr message) first :NAME)))))
-      (map
-        (fn [message]
-          (-> (filter match-srv message) first :NAME))))))
+  (->
+    (->> (query->answers (ptr-query service-path) :timeout timeout)
+         (filter
+           (fn [message]
+             (and
+               (some match-ptr message)
+               (= service-path (-> (filter match-ptr message) first :NAME)))))
+         (map
+           (fn [message]
+             (-> (filter match-srv message) first :NAME))))
+    set))
 
 (defn -main [& args]
   (run! println (service->names "_zzzzz._tcp.local"))
