@@ -56,9 +56,8 @@
            (fn [message]
              (-> (filter match-srv message)
                  first
-                 ((fn [answer]
-                    {:service (:NAME answer)
-                     :host (:host (:RDATA answer))}))))))
+                 ((fn [{service :NAME {host :host} :RDATA}]
+                    {:service service :host host}))))))
     set))
 
 (defn -main [& args]
