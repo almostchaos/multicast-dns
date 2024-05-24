@@ -5,7 +5,7 @@
     [dns.encoding :refer :all]
     [dns.message :refer :all]
     [socket.io.udp :refer [socket]]
-    [taoensso.timbre :refer [debug error info]]
+    [taoensso.timbre :refer [debug warn info]]
     [tick.core :as t])
   (:import (java.net InetAddress)))
 
@@ -69,7 +69,7 @@
                         (debug "sending response for" (str name "." type))
                         (send address port (apply answer parameters))
                         (catch Exception e
-                          (error "failed to respond to query," (.getMessage e)))))))
+                          (warn "cannot respond to query," (.getMessage e)))))))
 
         advertise (fn [service-type service-instance host port & {txt :txt ttl :ttl}]
                     (let [name (str service-instance "." service-type)
@@ -111,11 +111,11 @@
 (defn -main [& args]
   (let [{advertise :advertise shutdown :stop} (listen "0.0.0.0")
         host (.getHostName (InetAddress/getLocalHost))]
-    (advertise "_zzzzz._tcp.local" "B" host 36663 :txt {:path "/b" :q 0} :ttl 200)
-    (advertise "_airplay._tcp.local" "A" host 36663 :ttl 360)
+    (advertise "_zzzzz._tcp.local" "B" host 36663 :txt {:path "/b" :q 0})
+    (advertise "_airplay._tcp.local" "A" host 36663)
     (advertise "_spotify-connect._tcp.local" "A" host 36663)
     (advertise "_googlecast._tcp.local" "A" host 36663 :txt {:a 1 :b 2 :c "three"})
-    (advertise "_googlecast._tcp.local" "B" host 663 :ttl 120)
+    (advertise "_googlecast._tcp.local" "B" host 663 :ttl 300)
     (advertise "_octoprint._tcp.local" "A" host 36663 :txt {:bla 123})
     (on-term-signal
       (info "shutting down...")
