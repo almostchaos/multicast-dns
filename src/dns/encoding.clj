@@ -213,7 +213,11 @@
         host (decode-name (+ start 6) message)]
     {:priority priority :weight weight :port port :host host}))
 
-(defn- kv->tuple [kv] (string/split kv #"={1}"))
+(defn- kv->tuple [kv]
+  (let [tuple (string/split kv #"={1}")]
+    [(first tuple) (if (< (count tuple) 2)
+                     ""
+                     (last tuple))]))
 
 (defn- decode-txt-data [start length message]
   (let [data (take length (drop start message))
