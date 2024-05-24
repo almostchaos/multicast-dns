@@ -30,9 +30,7 @@
     (future
       (Thread/sleep ^long (if timeout (* timeout 1000) 2000))
       (async/close! messages))
-    (->>
-      (drain-channel-sequence messages close-socket)
-      (map decode-message))))
+      (map decode-message (drain-channel-sequence messages close-socket))))
 
 (defn name->ip [name & {timeout :timeout}]
   (->
@@ -56,7 +54,11 @@
                (= service-path (-> (filter match-ptr message) first :NAME)))))
          (map
            (fn [message]
-             (-> (filter match-srv message) first :NAME))))
+             (-> (filter match-srv message)
+                 first
+                 ((fn [answer]
+                    {:service (:NAME answer)
+                     :host (:host (:RDATA answer))}))))))
     set))
 
 (defn -main [& args]
