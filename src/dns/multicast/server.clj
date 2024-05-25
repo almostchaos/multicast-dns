@@ -5,7 +5,7 @@
     [dns.encoding :refer :all]
     [dns.message :refer :all]
     [socket.io.udp :refer [socket]]
-    [taoensso.timbre :refer [debug warn info]]
+    [taoensso.timbre :refer [debug info warn]]
     [tick.core :as t])
   (:import (java.net InetAddress)))
 
@@ -47,13 +47,11 @@
                       (->>
                         (rest message)
                         (filter known-question?)
-                        (map (fn [question]
-                               (let [type (:QTYPE question)
-                                     resource (:QNAME question)]
-                                 (cond
-                                   (= type:PTR type) [ptr-answer resource]
-                                   (= type:SRV type) [srv-answer resource]
-                                   (= type:TXT type) [txt-answer resource]))))
+                        (map (fn [{type :QTYPE resource :QNAME}]
+                               (cond
+                                 (= type:PTR type) [ptr-answer resource]
+                                 (= type:SRV type) [srv-answer resource]
+                                 (= type:TXT type) [txt-answer resource])))
                         (run! (partial >!! queried-resources))))))
 
 
