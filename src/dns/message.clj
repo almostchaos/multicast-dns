@@ -98,6 +98,8 @@
         (encode-answer service-instance type:TXT class:IN ttl (encode-txt-data txt))))))
 
 (defn txt-answer [service-path instance & {txt :txt time-to-live :ttl}]
+  (if (empty? txt)
+    (throw (new Exception "cannot serialize empty TXT resource"))
     (let [service-name (split service-path dot)
           service-instance (cons instance service-name)
           ttl (or time-to-live 120)]
@@ -116,4 +118,4 @@
           :ANCOUNT 1
           :NSCOUNT 0
           :ARCOUNT 1)
-        (encode-answer service-instance type:TXT class:IN ttl (encode-txt-data txt)))))
+        (encode-answer service-instance type:TXT class:IN ttl (encode-txt-data txt))))))
