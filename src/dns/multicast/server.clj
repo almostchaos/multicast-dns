@@ -60,7 +60,7 @@
 
         respond (fn [answer parameters]
                   (async/go
-                    (let [random-delay (long (+ 20 (rand 100)))
+                    (let [random-delay (long (rand 500))
                           [type name] parameters]
                       (try
                         (Thread/sleep random-delay)
