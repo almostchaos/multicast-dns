@@ -1,1 +1,0 @@
-[DNS Message Processing and General Message Format](http://www.tcpipguide.com/free/t_DNSMessageProcessingandGeneralMessageFormat.htm)
