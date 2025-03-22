@@ -67,21 +67,7 @@
                         (debug "sending response for" (str name "." type))
                         (send address port (apply answer parameters))
                         (catch Exception e
-                          (warn "cannot respond to query," (.getMessage e)))))))
-
-        advertise (fn [service-type service-instance host port & {txt :txt ttl :ttl}]
-                    (let [name (str service-instance "." service-type)
-                          parameters [service-type service-instance :host host :port port :txt txt]
-                          one-year (* 365 24 60 60)
-                          expiry (t/>> (t/instant) (t/new-duration (or ttl one-year) :seconds))]
-                      (swap! registered-resources conj [name parameters expiry])))
-
-        stop (fn []
-               (debug "stopping...")
-               (swap! running not)
-               (close-socket)
-               (async/close! queried-resources)
-               (debug "stopped listening"))]
+                          (warn "cannot respond to query," (.getMessage e)))))))]
     (future
       (info "listening...")
 
@@ -104,7 +90,18 @@
 
           (reset! registered-resources valid-registered-resources))))
 
-    {:advertise advertise :stop stop}))
+    {:advertise (fn [service-type service-instance host port & {txt :txt ttl :ttl}]
+                  (let [name (str service-instance "." service-type)
+                        parameters [service-type service-instance :host host :port port :txt txt]
+                        one-year (* 365 24 60 60)
+                        expiry (t/>> (t/instant) (t/new-duration (or ttl one-year) :seconds))]
+                    (swap! registered-resources conj [name parameters expiry])))
+     :stop      (fn []
+                  (debug "stopping...")
+                  (swap! running not)
+                  (close-socket)
+                  (async/close! queried-resources)
+                  (debug "stopped listening"))}))
 
 (defn -main [& args]
   (let [{advertise :advertise shutdown :stop} (listen "0.0.0.0")
