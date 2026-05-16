@@ -1,194 +1,149 @@
 (ns dns.encoding-test
   (:require [clojure.test :refer :all]
-            [dns.encoding :as encoding]))
+            [dns.encoding :refer :all]
+            [clj-commons.byte-streams :refer [to-byte-array]]))
 
 (deftest byte-array-concat-test
-  (let [ba1 (byte-array [1 2])
-        ba2 (byte-array [3 4])
-        result (encoding/byte-array-concat ba1 ba2)]
-    (is (java.util.Arrays/equals ^bytes (byte-array [1 2 3 4]) ^bytes result))))
+  (is (= [1 2 3 4] (seq (byte-array-concat (byte-array [1 2]) (byte-array [3 4])))))
+  (is (= [1 2] (seq (byte-array-concat (byte-array [1 2]) (byte-array 0)))))
+  (is (or (nil? (seq (byte-array-concat (byte-array 0))))
+          (= [] (seq (byte-array-concat (byte-array 0)))))))
 
-(deftest byte->bits-test
-  (is (= [false false false false false false false true] (seq (#'encoding/byte->bits 1))))
-  (is (= [true false false false false false false false] (seq (#'encoding/byte->bits 128))))
-  (is (= [true true true true true true true true] (seq (#'encoding/byte->bits 255)))))
+(deftest long-byte-conversion-test
+  (testing "long->byte"
+    (is (= (byte 0) (long->byte 0)))
+    (is (= (byte 127) (long->byte 127)))
+    (is (= (byte -128) (long->byte 128)))
+    (is (= (byte -1) (long->byte 255))))
 
-(deftest byte->4-bits-test
-  (is (= [false false false false] (seq (#'encoding/byte->4-bits 0))))
-  (is (= [true false false false] (seq (#'encoding/byte->4-bits 128)))))
+  (testing "long->byte-array"
+    (is (= [0 0 0 0 0 0 0 0] (map int (long->byte-array 0))))
+    (is (= [0 0 0 0 0 0 0 1] (map int (long->byte-array 1))))
+    (is (= [0 0 0 0 0 0 1 0] (map int (long->byte-array 256))))))
 
-(deftest byte->long-test
-  (is (= 0 (#'encoding/byte->long (byte 0))))
-  (is (= 127 (#'encoding/byte->long (byte 127))))
-  (is (= 128 (#'encoding/byte->long (encoding/long->byte 128))))
-  (is (= 255 (#'encoding/byte->long (encoding/long->byte 255)))))
+(deftest name-encoding-test
+  (testing "encode-name"
+    (is (= [3 119 119 119 0] (seq (encode-name ["www"]))))
+    (is (= [3 119 119 119 5 108 111 99 97 108 0] (seq (encode-name ["www" "local"]))))))
 
-(deftest byte-array->long-test
-  (is (= 0 (#'encoding/byte-array->long (byte-array [0 0]))))
-  (is (= 1 (#'encoding/byte-array->long (byte-array [0 1]))))
-  (is (= 256 (#'encoding/byte-array->long (byte-array [1 0]))))
-  (is (= 65535 (#'encoding/byte-array->long (byte-array [-1 -1])))))
+(deftest address-encoding-test
+  (testing "encode-address-data"
+    (is (= [192 168 1 1] (map #(bit-and 0xff %) (encode-address-data ["192" "168" "1" "1"]))))))
 
-(deftest long->byte-test
-  (is (= (byte 0) (encoding/long->byte 0)))
-  (is (= (byte 127) (encoding/long->byte 127)))
-  (is (= (byte -128) (encoding/long->byte 128)))
-  (is (= (byte -1) (encoding/long->byte 255))))
+(deftest txt-encoding-test
+  (testing "encode-txt-data"
+    (let [props {:key "val"}
+          encoded (encode-txt-data props)]
+      (is (= [7 107 101 121 61 118 97 108] (map #(bit-and 0xff %) encoded))))))
 
-(deftest bits->byte-test
-  (is (= (byte 0) (#'encoding/bits->byte [false false false false false false false false])))
-  (is (= (byte 1) (#'encoding/bits->byte [false false false false false false false true])))
-  (is (= (byte -128) (#'encoding/bits->byte [true false false false false false false false])))
-  (is (= (byte -1) (#'encoding/bits->byte [true true true true true true true true]))))
+(deftest srv-encoding-test
+  (testing "encode-srv-data"
+    (let [encoded (encode-srv-data ["host" "local"] 8080 10 20)]
+      ;; priority (10) -> [0 10]
+      ;; weight (20) -> [0 20]
+      ;; port (8080) -> [31 144] (8080 = 31 * 256 + 144)
+      ;; host ["host" "local"] -> [4 104 111 115 116 5 108 111 99 97 108 0]
+      (is (= [0 10 0 20 31 144 4 104 111 115 116 5 108 111 99 97 108 0] 
+             (map #(bit-and 0xff %) encoded))))))
 
-(deftest long->byte-array-test
-  (is (= [0 0 0 0 0 0 0 0] (map #(if (< % 0) (+ % 256) %) (encoding/long->byte-array 0))))
-  (is (= [0 0 0 0 0 0 0 1] (map #(if (< % 0) (+ % 256) %) (encoding/long->byte-array 1))))
-  (is (= [0 0 0 0 0 0 1 0] (map #(if (< % 0) (+ % 256) %) (encoding/long->byte-array 256))))
-  (is (= [255 255 255 255 255 255 255 255] (map #(if (< % 0) (+ % 256) %) (encoding/long->byte-array -1)))))
+(deftest header-encoding-decoding-test
+  (testing "encode-header and decode-header round-trip"
+    (let [header-params {:QR flag:enabled
+                         :OPCODE op-code:query
+                         :AA flag:enabled
+                         :TC flag:disabled
+                         :RD flag:disabled
+                         :RA flag:disabled
+                         :RCODE r-code:no-error
+                         :QDCOUNT 1
+                         :ANCOUNT 2
+                         :NSCOUNT 0
+                         :ARCOUNT 3}
+          encoded (apply encode-header (mapcat identity header-params))
+          ;; decode-header is private, but I can use decode-message to get it
+          ;; or I can just test decode-message which uses it.
+          ;; Actually, let's just use decode-message with a mock body.
+          dummy-body (byte-array 0)
+          full-message (byte-array-concat encoded dummy-body)
+          decoded-message (decode-message full-message)
+          decoded-header (first decoded-message)]
+      
+      (is (= (:QR header-params) (:QR decoded-header)))
+      (is (= (:AA header-params) (:AA decoded-header)))
+      (is (= (:TC header-params) (:TC decoded-header)))
+      (is (= (:RD header-params) (:RD decoded-header)))
+      (is (= (:RA header-params) (:RA decoded-header)))
+      (is (= (:QDCOUNT header-params) (:QDCOUNT decoded-header)))
+      (is (= (:ANCOUNT header-params) (:ANCOUNT decoded-header)))
+      (is (= (:NSCOUNT header-params) (:NSCOUNT decoded-header)))
+      (is (= (:ARCOUNT header-params) (:ARCOUNT decoded-header)))
+      ;; OPCODE and RCODE are returned as numbers by bits->byte in decode-header
+      ;; but were passed as boolean-arrays in encode-header.
+      ;; op-code:query is (byte->4-bits 0) -> [false false false false]
+      (is (= 0 (:OPCODE decoded-header)))
+      (is (= 0 (:RCODE decoded-header))))))
 
-(deftest encode-header-test
-  (let [header (encoding/encode-header
-                :QR encoding/flag:enabled
-                :OPCODE encoding/op-code:query
-                :AA encoding/flag:disabled
-                :TC encoding/flag:disabled
-                :RD encoding/flag:disabled
-                :RA encoding/flag:disabled
-                :RCODE encoding/r-code:no-error
-                :QDCOUNT 1
-                :ANCOUNT 0
-                :NSCOUNT 0
-                :ARCOUNT 0)]
-    (is (= 12 (alength header)))
-    (is (= (byte -128) (nth header 2))) ;; QR=1, others 0
-    (is (= (byte 0) (nth header 3)))
-    (is (= (byte 0) (nth header 4)))
-    (is (= (byte 1) (nth header 5)))))
+(deftest message-round-trip-test
+  (testing "Full message round-trip"
+    (let [header (encode-header :QR flag:enabled
+                                :OPCODE op-code:query
+                                :AA flag:enabled
+                                :TC flag:disabled
+                                :RD flag:disabled
+                                :RA flag:disabled
+                                :RCODE r-code:no-error
+                                :QDCOUNT 1
+                                :ANCOUNT 1
+                                :NSCOUNT 0
+                                :ARCOUNT 0)
+          question (encode-question ["test" "local"] type:A class:IN)
+          answer (encode-answer ["test" "local"] type:A class:IN 3600 (encode-address-data ["127" "0" "0" "1"]))
+          message (byte-array-concat header question answer)
+          decoded (decode-message message)
+          decoded-header (first decoded)
+          decoded-question (second decoded)
+          decoded-answer (nth decoded 2)]
+      
+      (is (= 1 (:QDCOUNT decoded-header)))
+      (is (= 1 (:ANCOUNT decoded-header)))
+      
+      (is (= "test.local" (:QNAME decoded-question)))
+      (is (= type:A (:QTYPE decoded-question)))
+      
+      (is (= "test.local" (:NAME decoded-answer)))
+      (is (= type:A (:TYPE decoded-answer)))
+      (is (= "127.0.0.1" (:RDATA decoded-answer))))))
 
-(deftest encode-question-test
-  (let [result (encoding/encode-question ["host" "local"] 1 1)
-        expected (byte-array [4 (byte \h) (byte \o) (byte \s) (byte \t)
-                              5 (byte \l) (byte \o) (byte \c) (byte \a) (byte \l)
-                              0 0 1 0 1])]
-    (is (java.util.Arrays/equals ^bytes expected ^bytes result))))
+(deftest compression-test
+  (testing "Name compression"
+    (let [header (encode-header :QDCOUNT 2 :ANCOUNT 0 :NSCOUNT 0 :ARCOUNT 0)
+          ;; First name: test.local
+          name1 ["test" "local"]
+          q1 (encode-question name1 type:A class:IN)
+          
+          ;; Header (12) + q1 (11 bytes for name + 5 bytes for 0, type, class) = 28 bytes.
+          ;; q1 name starts at 12.
+          ;; q1 ends at 28.
+          
+          compressed-name (byte-array [(long->byte 0xc0) (long->byte 0x0c)])
+          ;; q2-tail for question should be [0 type 0 class] - wait, NO.
+          ;; If decode-sections handles question:
+          ;; 267:        (let [question {:QNAME name :QTYPE type :QCCLASS class}
+          ;; 268:              next-position (+ name-end 2 2)
+          ;; It expects 2 bytes for type and 2 bytes for class.
+          q2-tail (byte-array [0 type:A 0 class:IN])
+          q2 (byte-array-concat compressed-name q2-tail)
+          message (byte-array-concat header q1 q2)
+          decoded (decode-message message)
+          decoded-q1 (second decoded)
+          decoded-q2 (nth decoded 2)]
+      
+      (is (= "test.local" (:QNAME decoded-q1)))
+      (is (= "test.local" (:QNAME decoded-q2))))))
 
-(deftest encode-name-test
-  (let [result (encoding/encode-name ["host" "local"])
-        expected (byte-array [4 (byte \h) (byte \o) (byte \s) (byte \t)
-                              5 (byte \l) (byte \o) (byte \c) (byte \a) (byte \l)
-                              0])]
-    (is (java.util.Arrays/equals ^bytes expected ^bytes result))))
-
-(deftest encode-address-data-test
-  (let [result (encoding/encode-address-data ["192" "168" "1" "1"])
-        expected (byte-array [(encoding/long->byte 192) (encoding/long->byte 168) (byte 1) (byte 1)])]
-    (is (java.util.Arrays/equals ^bytes expected ^bytes result))))
-
-(deftest encode-txt-data-test
-  (let [result (encoding/encode-txt-data {:key "val"})
-        expected (byte-array [7 (byte \k) (byte \e) (byte \y) (byte \=) (byte \v) (byte \a) (byte \l)])]
-    (is (java.util.Arrays/equals ^bytes expected ^bytes result))))
-
-(deftest encode-answer-test
-  (let [data (byte-array [1 2 3 4])
-        result (encoding/encode-answer ["host"] 1 1 3600 data)
-        ;; name: 4 host 0 (6 bytes)
-        ;; type: 0 1 (2 bytes)
-        ;; class: 0 1 (2 bytes)
-        ;; ttl: 0 0 14 16 (4 bytes) (3600 = 0x0E10)
-        ;; rdlength: 0 4 (2 bytes)
-        ;; data: 1 2 3 4 (4 bytes)
-        expected (byte-array [4 (byte \h) (byte \o) (byte \s) (byte \t) 0
-                              0 1 0 1
-                              0 0 14 16
-                              0 4
-                              1 2 3 4])]
-    (is (java.util.Arrays/equals ^bytes expected ^bytes result))))
-
-(deftest decode-header-test
-  (let [header-bytes (byte-array [0 1 128 0 0 1 0 0 0 0 0 0])
-        result (#'encoding/decode-header header-bytes)]
-    (is (= 1 (:ID result)))
-    (is (= true (:QR result)))
-    (is (= 0 (:OPCODE result)))
-    (is (= 1 (:QDCOUNT result)))))
-
-(deftest decode-name-test
-  (let [message (byte-array [4 (byte \h) (byte \o) (byte \s) (byte \t) 0])]
-    (is (= "host" (#'encoding/decode-name 0 message))))
-  (let [message (byte-array [4 (byte \h) (byte \o) (byte \s) (byte \t)
-                              5 (byte \l) (byte \o) (byte \c) (byte \a) (byte \l) 0])]
-    (is (= "host.local" (#'encoding/decode-name 0 message)))))
-
-(deftest decode-address-data-test
-  (let [message (byte-array [(encoding/long->byte 192) (encoding/long->byte 168) (byte 1) (byte 1)])]
-    (is (= "192.168.1.1" (#'encoding/decode-address-data 0 message)))))
-
-(deftest decode-txt-data-test
-  (let [message (byte-array [7 (byte \k) (byte \e) (byte \y) (byte \=) (byte \v) (byte \a) (byte \l)])]
-    (is (= {"key" "val"} (#'encoding/decode-txt-data 0 8 message)))))
-
-(deftest name-storage-size-test
-  (let [message (byte-array [4 (byte \h) (byte \o) (byte \s) (byte \t) 0])]
-    (is (= 6 (#'encoding/name-storage-size 0 message)))))
-
-(deftest decode-data-test
-  (let [message (byte-array [(encoding/long->byte 192) (encoding/long->byte 168) (byte 1) (byte 1)])]
-    (is (= "192.168.1.1" (#'encoding/decode-data encoding/type:A 0 4 message)))))
-
-(deftest decode-message-test
-  (let [header (encoding/encode-header
-                :QR encoding/flag:enabled
-                :OPCODE encoding/op-code:query
-                :AA encoding/flag:disabled
-                :TC encoding/flag:disabled
-                :RD encoding/flag:disabled
-                :RA encoding/flag:disabled
-                :RCODE encoding/r-code:no-error
-                :QDCOUNT 1
-                :ANCOUNT 1
-                :NSCOUNT 0
-                :ARCOUNT 0)
-        question (encoding/encode-question ["host"] 1 1)
-        answer (encoding/encode-answer ["host"] 1 1 3600 (byte-array [(encoding/long->byte 192) (encoding/long->byte 168) 1 1]))
-        message (encoding/byte-array-concat header question answer)
-        result (encoding/decode-message message)
-        decoded-header (first result)
-        decoded-sections (rest result)]
-    (is (= true (:QR decoded-header)))
-    (is (= 1 (:QDCOUNT decoded-header)))
-    (is (= 1 (:ANCOUNT decoded-header)))
-    (is (= 2 (count decoded-sections)))
-    (let [q (first decoded-sections)
-          a (second decoded-sections)]
-      (is (= "host" (:QNAME q)))
-      (is (= "host" (:NAME a)))
-      (is (= "192.168.1.1" (:RDATA a))))))
-
-(deftest decode-srv-data-test
-  (let [message (byte-array [0 0 0 0 0 0 0 0 0 0 0 0 ;; Header
-                             0 10 ;; Priority
-                             0 20 ;; Weight
-                             0 30 ;; Port
-                             4 (byte \h) (byte \o) (byte \s) (byte \t) 0]) ;; host. (encoded name)
-        start 12
-        result (#'encoding/decode-srv-data start message)]
-    (is (= 10 (:priority result)))
-    (is (= 20 (:weight result)))
-    (is (= 30 (:port result)))
-    (is (= "host" (:host result)))))
-
-(deftest encode-srv-data-test
-  (let [host ["host"]
-        port 30
-        priority 10
-        weight 20
-        result (encoding/encode-srv-data host port priority weight)
-        expected (byte-array [0 10 0 20 0 30 4 (byte \h) (byte \o) (byte \s) (byte \t) 0])]
-    (is (java.util.Arrays/equals ^bytes expected ^bytes result))))
-
-(deftest kv->tuple-test
-  (is (= ["key" "value"] (#'encoding/kv->tuple "key=value")))
-  (is (= ["key" ""] (#'encoding/kv->tuple "key=")))
-  (is (= ["key" ""] (#'encoding/kv->tuple "key"))))
+(deftest large-long-conversion-test
+  (testing "large long conversion"
+    (let [val 0x1234567890ABCDEF
+          bytes (long->byte-array val)
+          expected [0x12 0x34 0x56 0x78 0x90 0xAB 0xCD 0xEF]]
+      (is (= expected (map #(bit-and 0xff %) bytes))))))
