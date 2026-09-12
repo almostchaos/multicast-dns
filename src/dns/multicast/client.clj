@@ -22,15 +22,19 @@
 
 (defn- query->answers [message & {timeout :timeout}]
   (let [messages (async/chan 10)
-        receive (fn [_ _ message] (>!! messages message))
-        {send :send close-socket :close} (socket "0.0.0.0" port receive :multicast address)]
-
-    (send address port message)
-    ;listen a limited time for responses
-    (future
-      (Thread/sleep ^long (if timeout (* timeout 1000) 2000))
-      (async/close! messages))
-      (map decode-message (drain-channel-sequence messages close-socket))))
+        receive (fn [_ _ message] (>!! messages message))]
+    (socket
+      "0.0.0.0"
+      port
+      receive
+      (fn [send close-socket]
+        (send address port message)
+        ;listen a limited time for responses
+        (future
+          (Thread/sleep ^long (if timeout (* timeout 1000) 2000))
+          (async/close! messages))
+        (map decode-message (drain-channel-sequence messages close-socket)))
+      :multicast address)))
 
 (defn name->ip [name & {timeout :timeout}]
   (->
