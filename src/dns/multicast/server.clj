@@ -36,83 +36,91 @@
       (when item
         (cons item (drain-channel-sequence channel exit))))))
 
-(defn listen [bind-address]
+(defn listen [bind-address control]
   (let [registered-resources (atom nil)
         running (atom true)
-        queried-resources (async/chan 100)
+        queried-resources (async/chan 100)]
+    (socket
+      bind-address
+      port
+      ;;receive
+      (fn [_ _ packet]
+        (let [message (decode-message packet)]
+          (when (query? message)
+            (->>
+              (rest message)
+              (filter known-question?)
+              (map (fn [{type :QTYPE resource :QNAME}]
+                     (cond
+                       (= type:PTR type) [ptr-answer resource]
+                       (= type:SRV type) [srv-answer resource]
+                       (= type:TXT type) [txt-answer resource])))
+              (run! (partial >!! queried-resources))))))
+      ;;send/close
+      (fn [send close]
+        (let [respond
+              (fn [answer parameters]
+                (async/go
+                  (let [random-delay (long (rand 500))
+                        [type name] parameters]
+                    (try
+                      (Thread/sleep random-delay)
+                      (debug "sending response for" (str name "." type))
+                      (send address port (apply answer parameters))
+                      (catch Exception e
+                        (warn "cannot respond to query," (.getMessage e)))))))
 
-        receive (fn [_ _ packet]
-                  (let [message (decode-message packet)]
-                    (when (query? message)
-                      (->>
-                        (rest message)
-                        (filter known-question?)
-                        (map (fn [{type :QTYPE resource :QNAME}]
-                               (cond
-                                 (= type:PTR type) [ptr-answer resource]
-                                 (= type:SRV type) [srv-answer resource]
-                                 (= type:TXT type) [txt-answer resource])))
-                        (run! (partial >!! queried-resources))))))
+              advertise
+              (fn [service-type service-instance host port & {txt :txt ttl :ttl}]
+                (let [name (str service-instance "." service-type)
+                      parameters [service-type service-instance :host host :port port :txt txt]
+                      one-year (* 365 24 60 60)
+                      expiry (t/>> (t/instant) (t/new-duration (or ttl one-year) :seconds))]
+                  (swap! registered-resources conj [name parameters expiry])))
 
+              stop
+              (fn []
+                (debug "stopping...")
+                (swap! running not)
+                (close)
+                (async/close! queried-resources)
+                (debug "stopped listening"))]
+          (future
+            (info "listening...")
+            (while @running
+              (let [timed-exit (async/timeout 1000)
+                    now (t/instant)
+                    valid? (fn [[_ _ expiry]] (t/< now expiry))
+                    valid-registered-resources (filter valid? @registered-resources)]
+                (->>
+                  (distinct (drain-channel-sequence queried-resources timed-exit))
+                  (run! (fn [[answer queried-resource]]
+                          (->>
+                            valid-registered-resources
+                            (filter (fn [[name _ _]]
+                                      (string/ends-with? name queried-resource)))
+                            (run! (fn [[_ parameters expiry]]
+                                    (let [answer-ttl (t/seconds (t/between now expiry))
+                                          current-parameters (conj parameters :ttl answer-ttl)]
+                                      (respond answer current-parameters))))))))
 
-        {send         :send
-         close-socket :close} (socket bind-address port receive :multicast address)
+                (reset! registered-resources valid-registered-resources))))
 
-        respond (fn [answer parameters]
-                  (async/go
-                    (let [random-delay (long (rand 500))
-                          [type name] parameters]
-                      (try
-                        (Thread/sleep random-delay)
-                        (debug "sending response for" (str name "." type))
-                        (send address port (apply answer parameters))
-                        (catch Exception e
-                          (warn "cannot respond to query," (.getMessage e)))))))]
-    (future
-      (info "listening...")
-
-      (while @running
-        (let [timed-exit (async/timeout 1000)
-              now (t/instant)
-              valid? (fn [[_ _ expiry]] (t/< now expiry))
-              valid-registered-resources (filter valid? @registered-resources)]
-          (->>
-            (distinct (drain-channel-sequence queried-resources timed-exit))
-            (run! (fn [[answer queried-resource]]
-                    (->>
-                      valid-registered-resources
-                      (filter (fn [[name _ _]]
-                                (string/ends-with? name queried-resource)))
-                      (run! (fn [[_ parameters expiry]]
-                              (let [answer-ttl (t/seconds (t/between now expiry))
-                                    current-parameters (conj parameters :ttl answer-ttl)]
-                                (respond answer current-parameters))))))))
-
-          (reset! registered-resources valid-registered-resources))))
-
-    {:advertise (fn [service-type service-instance host port & {txt :txt ttl :ttl}]
-                  (let [name (str service-instance "." service-type)
-                        parameters [service-type service-instance :host host :port port :txt txt]
-                        one-year (* 365 24 60 60)
-                        expiry (t/>> (t/instant) (t/new-duration (or ttl one-year) :seconds))]
-                    (swap! registered-resources conj [name parameters expiry])))
-     :stop      (fn []
-                  (debug "stopping...")
-                  (swap! running not)
-                  (close-socket)
-                  (async/close! queried-resources)
-                  (debug "stopped listening"))}))
+          (control advertise stop)))
+      :multicast address)))
 
 (defn -main [& args]
-  (let [{advertise :advertise shutdown :stop} (listen "0.0.0.0")
-        host (.getHostName (InetAddress/getLocalHost))]
-    (advertise "_zzzzz._tcp.local" "B" host 36663 :txt {:path "/b" :q 0})
-    (advertise "_airplay._tcp.local" "A" host 36663)
-    (advertise "_spotify-connect._tcp.local" "A" host 36663)
-    (advertise "_googlecast._tcp.local" "A" host 36663 :txt {:a 1 :b 2 :c "three"})
-    (advertise "_googlecast._tcp.local" "B" host 663 :ttl 300)
-    (advertise "_octoprint._tcp.local" "A" host 36663 :txt {:bla 123})
-    (on-term-signal
-      (info "shutting down...")
-      (shutdown)
-      (shutdown-agents))))
+  (let [host (.getHostName (InetAddress/getLocalHost))]
+    (listen
+      "0.0.0.0"
+      (fn [advertise shutdown]
+        (advertise "_zzzzz._tcp.local" "B" host 36663 :txt {:path "/b" :q 0})
+        (advertise "_airplay._tcp.local" "A" host 36663)
+        (advertise "_spotify-connect._tcp.local" "A" host 36663)
+        (advertise "_googlecast._tcp.local" "A" host 36663 :txt {:a 1 :b 2 :c "three"})
+        (advertise "_googlecast._tcp.local" "B" host 663 :ttl 300)
+        (advertise "_octoprint._tcp.local" "A" host 36663 :txt {:bla 123})
+        (on-term-signal
+          (info "shutting down...")
+          (shutdown)
+          (shutdown-agents))))))

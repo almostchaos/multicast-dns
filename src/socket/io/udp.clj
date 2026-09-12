@@ -6,7 +6,7 @@
 
 (def max-payload 508)
 
-(defn socket [address port receiver & {multicast :multicast}]
+(defn socket [address port receiver control & {multicast :multicast}]
   "Naive implementation of UDP sockets."
 
   (let [bind-address (InetAddress/getByName address)
@@ -34,13 +34,13 @@
           (when-not (.isClosed inet-socket)
             (recur)))))
 
-    {:send  (fn [destination-address destination-port message]
-              (when-not (.isClosed inet-socket)
-                (let [address (InetAddress/getByName destination-address)
-                      data (to-byte-array message)
-                      data-length (alength data)]
-                  (.send inet-socket
-                         (new DatagramPacket data data-length address destination-port)))))
+    (control (fn [destination-address destination-port message]
+               (when-not (.isClosed inet-socket)
+                 (let [address (InetAddress/getByName destination-address)
+                       data (to-byte-array message)
+                       data-length (alength data)]
+                   (.send inet-socket
+                          (new DatagramPacket data data-length address destination-port)))))
 
-     :close (fn []
-              (.close inet-socket))}))
+             (fn []
+               (.close inet-socket)))))
