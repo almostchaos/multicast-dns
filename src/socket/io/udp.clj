@@ -6,9 +6,18 @@
 
 (def max-payload 508)
 
-(defn socket [address port receiver control & {multicast :multicast}]
-  "Naive implementation of UDP sockets."
+(defn socket
+  "Opens a unicast or multicast UDP socket and begins listening asynchronously.
 
+  Arguments:
+  - address   : Host/IP string to bind (e.g. \"0.0.0.0\").
+  - port      : Local port number to bind.
+  - receiver  : Callback fn (fn [host port data-bytes]) invoked for each incoming packet.
+  - control   : Setup fn (fn [send close]) called with functions to transmit datagrams
+                and shut down the socket.
+  - multicast : (Optional keyword arg) Multicast group IP to join (e.g. \"224.0.0.251\")."
+
+  [address port receiver control & {multicast :multicast}]
   (let [bind-address (InetAddress/getByName address)
         [inet-socket close] (if multicast
                               (let [multicast-address (InetAddress/getByName multicast)
