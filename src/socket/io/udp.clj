@@ -10,16 +10,19 @@
   "Naive implementation of UDP sockets."
 
   (let [bind-address (InetAddress/getByName address)
-        inet-socket (if multicast
-                      (let [multicast-address (InetAddress/getByName multicast)
-                            socket-address (new InetSocketAddress multicast-address port)
-                            multicast-socket (new MulticastSocket port)
-                            interface (NetworkInterface/getByInetAddress bind-address)]
-                        (.joinGroup multicast-socket socket-address interface)
-                        multicast-socket)
+        [inet-socket close-socket] (if multicast
+                                     (let [multicast-address (InetAddress/getByName multicast)
+                                           socket-address (new InetSocketAddress multicast-address port)
+                                           multicast-socket (new MulticastSocket port)
+                                           interface (NetworkInterface/getByInetAddress bind-address)]
+                                       (.joinGroup multicast-socket socket-address interface)
+                                       [multicast-socket (fn []
+                                                           (.leaveGroup multicast-socket socket-address interface)
+                                                           (.close multicast-socket))])
 
-                      (let [socket-address (new InetSocketAddress bind-address port)]
-                        (new DatagramSocket socket-address)))]
+                                     (let [socket-address (new InetSocketAddress bind-address port)
+                                           datagram-socket (new DatagramSocket socket-address)]
+                                       [datagram-socket (fn [] (.close datagram-socket))]))]
 
     (when-not (or (nil? address) (nil? receiver))
       (future
@@ -42,5 +45,4 @@
                    (.send inet-socket
                           (new DatagramPacket data data-length address destination-port)))))
 
-             (fn []
-               (.close inet-socket)))))
+             close-socket)))
