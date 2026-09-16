@@ -10,19 +10,28 @@
   "Naive implementation of UDP sockets."
 
   (let [bind-address (InetAddress/getByName address)
-        [inet-socket close-socket] (if multicast
-                                     (let [multicast-address (InetAddress/getByName multicast)
-                                           socket-address (new InetSocketAddress multicast-address port)
-                                           multicast-socket (new MulticastSocket port)
-                                           interface (NetworkInterface/getByInetAddress bind-address)]
-                                       (.joinGroup multicast-socket socket-address interface)
-                                       [multicast-socket (fn []
-                                                           (.leaveGroup multicast-socket socket-address interface)
-                                                           (.close multicast-socket))])
+        [inet-socket close] (if multicast
+                              (let [multicast-address (InetAddress/getByName multicast)
+                                    socket-address (new InetSocketAddress multicast-address port)
+                                    multicast-socket (new MulticastSocket port)
+                                    interface (NetworkInterface/getByInetAddress bind-address)
+                                    close-socket (fn []
+                                                   (.leaveGroup multicast-socket socket-address interface)
+                                                   (.close multicast-socket))]
+                                (.joinGroup multicast-socket socket-address interface)
+                                [multicast-socket close-socket])
 
-                                     (let [socket-address (new InetSocketAddress bind-address port)
-                                           datagram-socket (new DatagramSocket socket-address)]
-                                       [datagram-socket (fn [] (.close datagram-socket))]))]
+                              (let [socket-address (new InetSocketAddress bind-address port)
+                                    datagram-socket (new DatagramSocket socket-address)
+                                    close-socket (fn [] (.close datagram-socket))]
+                                [datagram-socket close-socket]))
+        send (fn [destination-address destination-port message]
+               (when-not (.isClosed inet-socket)
+                 (let [address (InetAddress/getByName destination-address)
+                       data (to-byte-array message)
+                       data-length (alength data)]
+                   (.send inet-socket
+                          (new DatagramPacket data data-length address destination-port)))))]
 
     (when-not (or (nil? address) (nil? receiver))
       (future
@@ -37,12 +46,4 @@
           (when-not (.isClosed inet-socket)
             (recur)))))
 
-    (control (fn [destination-address destination-port message]
-               (when-not (.isClosed inet-socket)
-                 (let [address (InetAddress/getByName destination-address)
-                       data (to-byte-array message)
-                       data-length (alength data)]
-                   (.send inet-socket
-                          (new DatagramPacket data data-length address destination-port)))))
-
-             close-socket)))
+    (control send close)))
