@@ -2,7 +2,7 @@
   (:require
     [clojure.data.json :as json]
     [clojure.java.io :as io]
-    [compojure.core :refer [DELETE POST routes]]
+    [compojure.core :refer [POST routes]]
     [compojure.route :as route])
   (:import (java.net InetAddress)))
 
@@ -39,8 +39,4 @@
             {:status  400
              :headers {"Content-Type" "application/json"}
              :body    (json/write-str {:error (.getMessage e)})}))))
-    (DELETE "*" {:keys [uri]}
-      {:status  200
-       :headers {"Content-Type" "text/plain"}
-       :body    (str "DELETE request handled for " uri)})
     (route/not-found "Not found")))
