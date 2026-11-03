@@ -90,21 +90,20 @@
             (while @running
               (let [timed-exit (async/timeout 1000)
                     now (t/instant)
-                    valid? (fn [[_ _ expiry]] (t/< now expiry))
-                    valid-registered-resources (filter valid? @registered-resources)]
+                    valid? (fn [[_ _ expiry]] (t/< now expiry))]
+                ;;discard expired resources
+                (swap! registered-resources (fn [resources] (vec (filter valid? resources))))
                 (->>
                   (distinct (drain-channel-sequence queried-resources timed-exit))
                   (run! (fn [[answer queried-resource]]
                           (->>
-                            valid-registered-resources
+                            @registered-resources
                             (filter (fn [[name _ _]]
                                       (string/ends-with? name queried-resource)))
                             (run! (fn [[_ parameters expiry]]
                                     (let [answer-ttl (t/seconds (t/between now expiry))
                                           current-parameters (conj parameters :ttl answer-ttl)]
-                                      (respond answer current-parameters))))))))
-
-                (reset! registered-resources valid-registered-resources))))
+                                      (respond answer current-parameters)))))))))))
 
           (control advertise stop)))
       :multicast address)))
@@ -116,9 +115,9 @@
       (fn [advertise shutdown]
         (advertise "_zzzzz._tcp.local" "B" host 36663 :txt {:path "/b" :q 0})
         (advertise "_airplay._tcp.local" "A" host 36663)
-        (advertise "_spotify-connect._tcp.local" "A" host 36663)
-        (advertise "_googlecast._tcp.local" "A" host 36663 :txt {:a 1 :b 2 :c "three"})
-        (advertise "_googlecast._tcp.local" "B" host 663 :ttl 300)
+        (advertise "_spotify-connect._tcp.local" "A" host 36663 :txt {:CPath "/zc" :VERSION "1.0" :Stack "SP"})
+        (advertise "_googlecast._tcp.local" "A" host 36663)
+        (advertise "_googlecast._tcp.local" "B" host 663 :ttl 30)
         (advertise "_octoprint._tcp.local" "A" host 36663 :txt {:bla 123})
         (on-term-signal
           (info "shutting down...")
