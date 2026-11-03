@@ -4,6 +4,8 @@
     [clojure.string :as string]
     [dns.encoding :refer :all]
     [dns.message :refer :all]
+    [dns.multicast.config-server :as config-server]
+    [org.httpkit.server :as http]
     [socket.io.udp :refer [socket]]
     [taoensso.timbre :refer [debug info warn]]
     [tick.core :as t])
@@ -11,6 +13,7 @@
 
 (def port 5353)
 (def address "224.0.0.251")
+(def http-port 3000)
 
 (defn- query? [message]
   (not (:QR (first message))))
@@ -113,13 +116,16 @@
     (listen
       "0.0.0.0"
       (fn [advertise shutdown]
-        (advertise "_zzzzz._tcp.local" "B" host 36663 :txt {:path "/b" :q 0})
-        (advertise "_airplay._tcp.local" "A" host 36663)
-        (advertise "_spotify-connect._tcp.local" "A" host 36663 :txt {:CPath "/zc" :VERSION "1.0" :Stack "SP"})
-        (advertise "_googlecast._tcp.local" "A" host 36663)
-        (advertise "_googlecast._tcp.local" "B" host 663 :ttl 30)
-        (advertise "_octoprint._tcp.local" "A" host 36663 :txt {:bla 123})
-        (on-term-signal
-          (info "shutting down...")
-          (shutdown)
-          (shutdown-agents))))))
+        ;(advertise "_zzzzz._tcp.local" "B" host 36663 :txt {:path "/b" :q 0})
+        ;(advertise "_airplay._tcp.local" "A" host 36663)
+        ;(advertise "_spotify-connect._tcp.local" "A" host 36663 :txt {:CPath "/zc" :VERSION "1.0" :Stack "SP"})
+        ;(advertise "_googlecast._tcp.local" "A" host 36663)
+        ;(advertise "_googlecast._tcp.local" "B" host 663 :ttl 30)
+        ;(advertise "_octoprint._tcp.local" "A" host 36663 :txt {:bla 123})
+        (let [app (config-server/app advertise :host host)
+              shutdown-config-server (http/run-server app {:port http-port})]
+          (on-term-signal
+            (info "shutting down...")
+            (shutdown)
+            (shutdown-config-server :timeout 100)
+            (shutdown-agents)))))))

@@ -66,8 +66,9 @@
 
 (defn -main [& args]
   (run! println (service->names "_zzzzz._tcp.local"))
-  (run! println (service->names "_googlecast._tcp.local" :timeout 5))
+  (run! println (service->names "_googlecast._tcp.local" :timeout 15))
   (run! println (service->names "_octoprint._tcp.local"))
   (println (name->ip "octopi.local"))
 
-  (shutdown-agents))
+  (shutdown-agents)
+  )

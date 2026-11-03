@@ -3,5 +3,8 @@
            org.clojure/core.async       {:mvn/version "1.6.673"}
            com.fzakaria/slf4j-timbre    {:mvn/version "0.4.0"}
            org.clj-commons/byte-streams {:mvn/version "0.3.4"}
+           http-kit/http-kit            {:mvn/version "2.8.0"}
+           compojure/compojure          {:mvn/version "1.7.1"}
+           org.clojure/data.json        {:mvn/version "2.5.0"}
            tick/tick                    {:mvn/version "RELEASE"}}
  :aliases {:app {:exec-fn dns.multicast.browse/-main}}}
