@@ -1,0 +1,18 @@
+services:
+  mdns-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mdns-server:latest
+    container_name: mdns-server
+    restart: unless-stopped
+    ports:
+      # Explicitly bind to 0.0.0.0 to guarantee accessibility across all host interfaces
+      - "5353:5353/udp"  # mDNS multicast DNS discovery
+      - "3000:3000/tcp"  # HTTP configuration server API
+      - "5005:5005/tcp"  # Remote JVM debug port (JDWP)
+    # For native Linux deployments requiring raw host network access for mDNS multicast,
+    # you can switch to host mode by uncommenting 'network_mode: host' and commenting 'networks' & 'ports':
+    # network_mode: host
+    environment:
+      - JAVA_TOOL_OPTIONS=-Djava.net.preferIPv4Stack=true -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
