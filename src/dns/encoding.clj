@@ -131,14 +131,16 @@
       (encode-name host))))
 
 (defn encode-txt-data [properties]
-  (byte-array
-    (flatten
-      (map (fn [[key value]]
-             (let [property (str (name key) "=" value)]
-               (cons
-                 (long->byte (count property))
-                 (to-byte-array property))))
-           properties))))
+  (if (empty? properties)
+    (byte-array [0])
+    (byte-array
+      (flatten
+        (map (fn [[key value]]
+               (let [property (str (name key) "=" value)]
+                 (cons
+                   (long->byte (count property))
+                   (to-byte-array property))))
+             properties)))))
 
 (defn encode-answer [service type class ttl data]
   (let [rd-length (alength data)
@@ -220,18 +222,24 @@
                      (last tuple))]))
 
 (defn- decode-txt-data [start length message]
-  (let [data (take length (drop start message))
-        texts (loop [input data
-                     result nil]
-                (let [part-length (first input)
-                      part (take part-length (drop 1 input))
-                      txt (to-string (byte-array part))
-                      input-rest (drop (+ 1 part-length) input)
-                      result-partial (cons txt result)]
-                  (if (empty? input-rest)
-                    result-partial
-                    (recur input-rest result-partial))))]
-    (apply array-map (flatten (map kv->tuple texts)))))
+  (if (zero? length)
+    {}
+    (let [data (take length (drop start message))
+          texts (loop [input data
+                       result nil]
+                  (if (empty? input)
+                    result
+                    (let [part-length (byte->long (first input))
+                          part (take part-length (drop 1 input))
+                          txt (to-string (byte-array part))
+                          input-rest (drop (+ 1 part-length) input)
+                          result-partial (if (seq txt) (cons txt result) result)]
+                      (if (empty? input-rest)
+                        result-partial
+                        (recur input-rest result-partial)))))]
+      (if (empty? texts)
+        {}
+        (apply array-map (flatten (map kv->tuple texts)))))))
 
 (defn- name-storage-size [start message]
   (if (> (alength message) start)

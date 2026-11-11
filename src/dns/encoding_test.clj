@@ -34,7 +34,10 @@
   (testing "encode-txt-data"
     (let [props {:key "val"}
           encoded (encode-txt-data props)]
-      (is (= [7 107 101 121 61 118 97 108] (map #(bit-and 0xff %) encoded))))))
+      (is (= [7 107 101 121 61 118 97 108] (map #(bit-and 0xff %) encoded)))))
+  (testing "encode-txt-data with empty map or nil"
+    (is (= [0] (seq (encode-txt-data {}))))
+    (is (= [0] (seq (encode-txt-data nil))))))
 
 (deftest srv-encoding-test
   (testing "encode-srv-data"

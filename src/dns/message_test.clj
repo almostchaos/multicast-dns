@@ -119,5 +119,26 @@
       (is (= encoding/type:TXT (:TYPE (first answers))))
       (is (= {"id" "123"} (:RDATA (first answers))))))
   
-  (testing "Empty TXT should throw"
-    (is (thrown? Exception (txt-answer "_googlecast._tcp.local" "my-instance" :txt {})))))
+  (testing "Empty TXT answer"
+    (let [service-path "_googlecast._tcp.local"
+          instance "my-instance"
+          message (txt-answer service-path instance :txt {})
+          decoded (encoding/decode-message message)
+          header (first decoded)
+          answers (rest decoded)]
+      (is (= 1 (:ANCOUNT header)))
+      (is (= 1 (count answers)))
+      (is (= encoding/type:TXT (:TYPE (first answers))))
+      (is (= {} (:RDATA (first answers))))))
+
+  (testing "Nil TXT answer"
+    (let [service-path "_googlecast._tcp.local"
+          instance "my-instance"
+          message (txt-answer service-path instance)
+          decoded (encoding/decode-message message)
+          header (first decoded)
+          answers (rest decoded)]
+      (is (= 1 (:ANCOUNT header)))
+      (is (= 1 (count answers)))
+      (is (= encoding/type:TXT (:TYPE (first answers))))
+      (is (= {} (:RDATA (first answers)))))))

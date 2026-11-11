@@ -98,24 +98,22 @@
         (encode-answer service-instance type:TXT class:IN ttl (encode-txt-data txt))))))
 
 (defn txt-answer [service-path instance & {txt :txt time-to-live :ttl}]
-  (if (empty? txt)
-    (throw (new Exception "cannot serialize empty TXT resource"))
-    (let [service-name (split service-path dot)
-          service-instance (cons instance service-name)
-          ttl (or time-to-live 120)]
-      (byte-array-concat
-        (encode-header
-          :QR flag:enabled
-          :OPCODE op-code:query
-          :AA flag:disabled
-          :TC flag:disabled
-          :RD flag:disabled
-          :RA flag:disabled
-          :AD flag:disabled
-          :CD flag:disabled
-          :RCODE r-code:no-error
-          :QDCOUNT 0
-          :ANCOUNT 1
-          :NSCOUNT 0
-          :ARCOUNT 1)
-        (encode-answer service-instance type:TXT class:IN ttl (encode-txt-data txt))))))
+  (let [service-name (split service-path dot)
+        service-instance (cons instance service-name)
+        ttl (or time-to-live 120)]
+    (byte-array-concat
+      (encode-header
+        :QR flag:enabled
+        :OPCODE op-code:query
+        :AA flag:disabled
+        :TC flag:disabled
+        :RD flag:disabled
+        :RA flag:disabled
+        :AD flag:disabled
+        :CD flag:disabled
+        :RCODE r-code:no-error
+        :QDCOUNT 0
+        :ANCOUNT 1
+        :NSCOUNT 0
+        :ARCOUNT 1)
+      (encode-answer service-instance type:TXT class:IN ttl (encode-txt-data txt)))))

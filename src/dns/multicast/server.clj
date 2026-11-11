@@ -48,17 +48,20 @@
       port
       ;;receive
       (fn [_ _ packet]
-        (let [message (decode-message packet)]
-          (when (query? message)
-            (->>
-              (rest message)
-              (filter known-question?)
-              (map (fn [{type :QTYPE resource :QNAME}]
-                     (cond
-                       (= type:PTR type) [ptr-answer resource]
-                       (= type:SRV type) [srv-answer resource]
-                       (= type:TXT type) [txt-answer resource])))
-              (run! (partial >!! queried-resources))))))
+        (try
+          (let [message (decode-message packet)]
+            (when (query? message)
+              (->>
+                (rest message)
+                (filter known-question?)
+                (map (fn [{type :QTYPE resource :QNAME}]
+                       (cond
+                         (= type:PTR type) [ptr-answer resource]
+                         (= type:SRV type) [srv-answer resource]
+                         (= type:TXT type) [txt-answer resource])))
+                (run! (partial >!! queried-resources)))))
+          (catch Exception e
+            (warn "cannot process incoming packet," (.getMessage e)))))
       ;;send/close
       (fn [send close]
         (let [respond
@@ -115,12 +118,13 @@
   (listen
     "0.0.0.0"
     (fn [advertise shutdown]
-      ;(advertise "_zzzzz._tcp.local" "B" "127.0.0.1" 36663 :txt {:path "/b" :q 0})
-      ;(advertise "_airplay._tcp.local" "A" "127.0.0.1" 36663)
-      ;(advertise "_spotify-connect._tcp.local" "A" host 36663 :txt {:CPath "/zc" :VERSION "1.0" :Stack "SP"})
-      ;(advertise "_googlecast._tcp.local" "A" "127.0.0.1" 36663)
-      ;(advertise "_googlecast._tcp.local" "B" host 663 :ttl 30)
-      ;(advertise "_octoprint._tcp.local" "A" host 36663 :txt {:bla 123})
+      (let [host "127.0.0.1"]
+        (advertise "_zzzzz._tcp.local" "B" "127.0.0.1" 36663 :txt {:path "/b" :q 0})
+        (advertise "_airplay._tcp.local" "A" "127.0.0.1" 36663)
+        (advertise "_spotify-connect._tcp.local" "A" host 36663 :txt {:CPath "/zc" :VERSION "1.0" :Stack "SP"})
+        (advertise "_googlecast._tcp.local" "A" "127.0.0.1" 36663)
+        (advertise "_googlecast._tcp.local" "B" host 663 :ttl 30)
+        (advertise "_octoprint._tcp.local" "A" host 36663 :txt {:bla 123}))
       (let [app (config-server/app advertise)
             shutdown-config-server (http/run-server app {:port http-port})]
         (on-term-signal
