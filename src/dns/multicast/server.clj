@@ -1,6 +1,6 @@
 (ns dns.multicast.server
   (:require
-    [clojure.core.async :as async :refer [>!! alts!!]]
+    [clojure.core.async :as async :refer [>!! alts!! offer!]]
     [clojure.string :as string]
     [dns.encoding :refer :all]
     [dns.message :refer :all]
@@ -59,7 +59,7 @@
                          (= type:PTR type) [ptr-answer resource]
                          (= type:SRV type) [srv-answer resource]
                          (= type:TXT type) [txt-answer resource])))
-                (run! (partial >!! queried-resources)))))
+                (run! (partial offer! queried-resources)))))
           (catch Exception e
             (warn "cannot process incoming packet," (.getMessage e)))))
       ;;send/close
