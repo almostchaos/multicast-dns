@@ -1,6 +1,6 @@
 (ns dns.multicast.server
   (:require
-    [clojure.core.async :as async :refer [>!! alts!! offer!]]
+    [clojure.core.async :as async :refer [alts!! offer!]]
     [clojure.string :as string]
     [dns.encoding :refer :all]
     [dns.message :refer :all]
@@ -79,10 +79,8 @@
               advertise
               (fn [service-type service-instance host port & {txt :txt ttl :ttl}]
                 (let [name (str service-instance "." service-type)
-                      parameters [service-type service-instance :host host :port port :txt txt]
-                      one-year (* 365 24 60 60)
-                      expiry (t/>> (t/instant) (t/new-duration (or ttl one-year) :seconds))]
-                  (swap! registered-resources conj [name parameters expiry])))
+                      parameters [service-type service-instance :host host :port port :txt txt]]
+                  (swap! registered-resources conj [name parameters])))
 
               stop
               (fn []
@@ -94,11 +92,7 @@
           (future
             (info "listening...")
             (while @running
-              (let [timed-exit (async/timeout 1000)
-                    now (t/instant)
-                    valid? (fn [[_ _ expiry]] (t/< now expiry))]
-                ;;discard expired resources
-                (swap! registered-resources (fn [resources] (vec (filter valid? resources))))
+              (let [timed-exit (async/timeout 1000)]
                 (->>
                   (distinct (drain-channel-sequence queried-resources timed-exit))
                   (run! (fn [[answer queried-resource]]
@@ -106,10 +100,8 @@
                             @registered-resources
                             (filter (fn [[name _ _]]
                                       (string/ends-with? name queried-resource)))
-                            (run! (fn [[_ parameters expiry]]
-                                    (let [answer-ttl (t/seconds (t/between now expiry))
-                                          current-parameters (conj parameters :ttl answer-ttl)]
-                                      (respond answer current-parameters)))))))))))
+                            (run! (fn [[_ parameters]]
+                                    (respond answer parameters))))))))))
 
           (control advertise stop)))
       :multicast address)))
