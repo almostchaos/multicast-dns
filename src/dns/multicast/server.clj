@@ -87,7 +87,7 @@
               stop
               (fn []
                 (debug "stopping...")
-                (swap! running not)
+                (reset! running false)
                 (close)
                 (async/close! queried-resources)
                 (debug "stopped listening"))]
