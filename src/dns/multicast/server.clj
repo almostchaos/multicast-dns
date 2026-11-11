@@ -40,7 +40,7 @@
         (cons item (drain-channel-sequence channel exit))))))
 
 (defn listen [bind-address control]
-  (let [registered-resources (atom nil)
+  (let [registered-resources (atom {})
         running (atom true)
         queried-resources (async/chan 100)]
     (socket
@@ -79,8 +79,8 @@
               advertise
               (fn [service-type service-instance host port & {txt :txt ttl :ttl}]
                 (let [name (str service-instance "." service-type)
-                      parameters [service-type service-instance :host host :port port :txt txt]]
-                  (swap! registered-resources conj [name parameters])))
+                      service-info [service-type service-instance :host host :port port :txt txt]]
+                  (swap! registered-resources assoc name service-info)))
 
               stop
               (fn []
@@ -98,7 +98,7 @@
                   (run! (fn [[answer queried-resource]]
                           (->>
                             @registered-resources
-                            (filter (fn [[name _ _]]
+                            (filter (fn [[name _]]
                                       (string/ends-with? name queried-resource)))
                             (run! (fn [[_ parameters]]
                                     (respond answer parameters))))))))))
