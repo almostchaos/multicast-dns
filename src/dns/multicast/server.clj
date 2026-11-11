@@ -25,13 +25,13 @@
       (= type:SRV type)
       (= type:TXT type))))
 
-(defmacro on-term-signal [& handler]
-  `(.addShutdownHook
-     (Runtime/getRuntime)
-     (new Thread
-          (fn []
-            (debug "sigterm captured")
-            ~@handler))))
+(defn- on-term-signal [handler]
+  (.addShutdownHook
+    (Runtime/getRuntime)
+    (Thread.
+      (fn []
+        (debug "sigterm captured")
+        (handler)))))
 
 (defn- drain-channel-sequence [channel exit]
   (lazy-seq
@@ -128,7 +128,8 @@
       (let [app (config-server/app advertise)
             shutdown-config-server (http/run-server app {:port http-port})]
         (on-term-signal
-          (info "shutting down...")
-          (shutdown)
-          (shutdown-config-server :timeout 100)
-          (shutdown-agents))))))
+          (fn []
+            (info "shutting down...")
+            (shutdown)
+            (shutdown-config-server :timeout 100)
+            (shutdown-agents)))))))
