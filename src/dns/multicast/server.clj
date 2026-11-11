@@ -70,7 +70,7 @@
                   (let [random-delay (long (rand 500))
                         [type name] parameters]
                     (try
-                      (Thread/sleep random-delay)
+                      (async/<! (async/timeout random-delay))
                       (debug "sending response for" (str name "." type))
                       (send address port (apply answer parameters))
                       (catch Exception e
