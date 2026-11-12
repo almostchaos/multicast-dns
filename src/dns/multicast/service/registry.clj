@@ -7,7 +7,7 @@
 
         lookup
         (fn [query]
-          (filter (fn [[name _]] (string/ends-with? name query))) @resources)
+          (filter (fn [[name _]] (string/ends-with? name query)) @resources))
 
         register
         (fn [name info]
