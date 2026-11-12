@@ -1,10 +1,9 @@
-(ns dns.multicast.config-server
+(ns dns.multicast.service.config-server
   (:require
     [clojure.data.json :as json]
     [clojure.java.io :as io]
     [compojure.core :refer [POST routes]]
-    [compojure.route :as route])
-  (:import (java.net InetAddress)))
+    [compojure.route :as route]))
 
 (defn app [advertise]
   (routes

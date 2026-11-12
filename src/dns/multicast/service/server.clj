@@ -1,14 +1,13 @@
-(ns dns.multicast.server
+(ns dns.multicast.service.server
   (:require
     [clojure.core.async :as async :refer [alts!! offer!]]
-    [clojure.string :as string]
     [dns.encoding :refer :all]
     [dns.message :refer :all]
-    [dns.multicast.config-server :as config-server]
+    [dns.multicast.service.config-server :as config-server]
+    [dns.multicast.service.registry :refer [create-registry]]
     [org.httpkit.server :as http]
     [socket.io.udp :refer [socket]]
-    [taoensso.timbre :refer [debug info warn]]
-    [tick.core :as t])
+    [taoensso.timbre :refer [debug info warn]])
   (:gen-class))
 
 (def port 5353)
@@ -40,7 +39,7 @@
         (cons item (drain-channel-sequence channel exit))))))
 
 (defn listen [bind-address control]
-  (let [registered-resources (atom {})
+  (let [registry (create-registry)
         running (atom true)
         queried-resources (async/chan 100)]
     (socket
@@ -78,9 +77,11 @@
 
               advertise
               (fn [service-type service-instance host port & {txt :txt ttl :ttl}]
-                (let [name (str service-instance "." service-type)
-                      service-info [service-type service-instance :host host :port port :txt txt]]
-                  (swap! registered-resources assoc name service-info)))
+                (registry
+                  (fn [_ register]
+                    (register
+                      (str service-instance "." service-type)
+                      [service-type service-instance :host host :port port :txt txt :ttl (or ttl 120)]))))
 
               stop
               (fn []
@@ -95,13 +96,11 @@
               (let [timed-exit (async/timeout 1000)]
                 (->>
                   (distinct (drain-channel-sequence queried-resources timed-exit))
-                  (run! (fn [[answer queried-resource]]
-                          (->>
-                            @registered-resources
-                            (filter (fn [[name _]]
-                                      (string/ends-with? name queried-resource)))
-                            (run! (fn [[_ parameters]]
-                                    (respond answer parameters))))))))))
+                  (run!
+                    (fn [[answer queried-resource]]
+                      (->>
+                        (registry (fn [lookup _] (lookup queried-resource)))
+                        (run! (fn [[_ info]] (respond answer info))))))))))
 
           (control advertise stop)))
       :multicast address)))
@@ -111,7 +110,7 @@
     "0.0.0.0"
     (fn [advertise shutdown]
       (let [host "127.0.0.1"]
-        (advertise "_zzzzz._tcp.local" "B" "127.0.0.1" 36663 :txt {:path "/b" :q 0})
+        (advertise "_ssh._tcp.local" "B" "127.0.0.1" 36663 :txt {:path "/b" :q 0} :ttl 30)
         (advertise "_airplay._tcp.local" "A" "127.0.0.1" 36663)
         (advertise "_spotify-connect._tcp.local" "A" host 36663 :txt {:CPath "/zc" :VERSION "1.0" :Stack "SP"})
         (advertise "_googlecast._tcp.local" "A" "127.0.0.1" 36663)
