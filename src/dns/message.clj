@@ -43,7 +43,7 @@
         :ARCOUNT 0)
       (encode-question service-path type:A class:IN))))
 
-(defn ptr-answer [service-path instance & {hostname :host port :port txt :txt time-to-live :ttl}]
+(defn ptr-answer [service-path instance & {hostname :host ip :ip port :port txt :txt time-to-live :ttl}]
   (let [priority 0
         weight 0
         service-name (split service-path dot)
@@ -67,11 +67,12 @@
         :NSCOUNT 0
         :ARCOUNT (if (empty? txt) 1 2))
       (encode-answer service-name type:PTR class:IN ttl (encode-name service-instance))
-      (encode-answer service-instance type:SRV class:IN ttl (encode-srv-data host port priority weight))
+      (when (and host port)
+        (encode-answer service-instance type:SRV class:IN ttl (encode-srv-data host port priority weight)))
       (when-not (empty? txt)
         (encode-answer service-instance type:TXT class:IN ttl (encode-txt-data txt))))))
 
-(defn srv-answer [service-path instance & {hostname :host port :port txt :txt time-to-live :ttl}]
+(defn srv-answer [service-path instance & {hostname :host ip :ip port :port txt :txt time-to-live :ttl}]
   (let [priority 0
         weight 0
         service-name (split service-path dot)
