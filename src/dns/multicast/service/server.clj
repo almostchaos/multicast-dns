@@ -110,13 +110,12 @@
   (listen
     "0.0.0.0"
     (fn [advertise shutdown]
-      (let [host "127.0.0.1"]
-        ;(advertise "_ssh._tcp.local" "B" :host "127.0.0.1" :txt {:path "/b" :q 0} :ttl 30)
-        ;(advertise "_airplay._tcp.local" "A" :host "127.0.0.1" :port 36663)
-        ;(advertise "_spotify-connect._tcp.local" "A" :host host :port 36663 :txt {:CPath "/zc" :VERSION "1.0" :Stack "SP"})
-        ;(advertise "_googlecast._tcp.local" "A" :host "127.0.0.1" :port 36663)
-        ;(advertise "_googlecast._tcp.local" "B" :host host :port 663 :ttl 30)
-        (advertise "_octoprint._tcp.local" "A" :host host :port 80 :txt {:bla 1000}))
+      (let [name "test" host "test.local"]
+        (advertise "_ssh._tcp.local" name :host host :ip ["192" "168" "0" "144"] :port 22)
+        (advertise "_airplay._tcp.local" name :host host :port 36663)
+        (advertise "_spotify-connect._tcp.local" name :host host :port 36663 :txt {:CPath "/zc" :VERSION "1.0" :Stack "SP"})
+        (advertise "_googlecast._tcp.local" name :host host :port 10000)
+        (advertise "_octoprint._tcp.local" name :host host :ip ["192" "168" "0" "144"] :port 80 :txt {:bla 100}))
       (let [app (config-server/app advertise)
             shutdown-config-server (http/run-server app {:port http-port})]
         (on-term-signal
