@@ -34,9 +34,9 @@
 
 (defn- drain-channel-sequence [channel exit]
   (lazy-seq
-    (let [[item channel] (alts!! [channel exit])]
+    (let [[item port] (alts!! [channel exit])]
       (when item
-        (cons item (drain-channel-sequence channel exit))))))
+        (cons item (drain-channel-sequence port exit))))))
 
 (defn listen [bind-address control]
   (let [registry (create-registry)
