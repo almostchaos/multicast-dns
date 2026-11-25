@@ -1,10 +1,10 @@
 (ns dns.multicast.service.registry-test
   (:require [clojure.test :refer :all]
-            [dns.multicast.service.registry :refer [create-registry]]))
+            [dns.multicast.service.registry :refer [create-service-registry]]))
 
 (deftest create-registry-test
   (testing "creates a registry control function that passes lookup and register"
-    (let [registry (create-registry)]
+    (let [registry (create-service-registry)]
       (is (fn? registry))
       (registry
         (fn [lookup register]
@@ -12,13 +12,13 @@
           (is (fn? register))))))
 
   (testing "registry returns the result of the control function"
-    (let [registry (create-registry)
+    (let [registry (create-service-registry)
           result (registry (fn [_ _] :custom-result))]
       (is (= :custom-result result)))))
 
 (deftest empty-registry-lookup-test
   (testing "lookup on empty registry returns empty sequence"
-    (let [registry (create-registry)]
+    (let [registry (create-service-registry)]
       (registry
         (fn [lookup _]
           (is (empty? (lookup "anything")))
@@ -27,7 +27,7 @@
 
 (deftest register-and-lookup-test
   (testing "register and lookup by exact match"
-    (let [registry (create-registry)
+    (let [registry (create-service-registry)
           service-name "my-service._http._tcp.local"
           service-info ["_http._tcp.local" "my-service" :host "127.0.0.1" :port 8080]]
       (registry
@@ -38,7 +38,7 @@
             (is (= service-info (get results service-name))))))))
 
   (testing "lookup by service type suffix"
-    (let [registry (create-registry)
+    (let [registry (create-service-registry)
           service-name "my-service._http._tcp.local"
           service-info ["_http._tcp.local" "my-service" :host "127.0.0.1" :port 8080]]
       (registry
@@ -50,7 +50,7 @@
           (is (= {service-name service-info} (into {} (lookup ""))))))))
 
   (testing "lookup non-matching query returns empty"
-    (let [registry (create-registry)]
+    (let [registry (create-service-registry)]
       (registry
         (fn [lookup register]
           (register "my-service._http._tcp.local" {:port 8080})
@@ -60,7 +60,7 @@
 
 (deftest multiple-resources-lookup-test
   (testing "filters resources ending with query"
-    (let [registry (create-registry)
+    (let [registry (create-service-registry)
           http-1 "instance-1._http._tcp.local"
           http-2 "instance-2._http._tcp.local"
           ssh-1  "instance-1._ssh._tcp.local"
@@ -97,7 +97,7 @@
 
 (deftest overwrite-registration-test
   (testing "registering with existing name updates its info"
-    (let [registry (create-registry)
+    (let [registry (create-service-registry)
           service-name "printer._ipp._tcp.local"
           initial-info {:port 631 :status "idle"}
           updated-info {:port 631 :status "printing"}]
@@ -113,8 +113,8 @@
 
 (deftest registry-isolation-test
   (testing "distinct registry instances are isolated from each other"
-    (let [reg1 (create-registry)
-          reg2 (create-registry)]
+    (let [reg1 (create-service-registry)
+          reg2 (create-service-registry)]
       (reg1 (fn [_ register] (register "svc-1._http._tcp.local" {:reg 1})))
       (reg2 (fn [_ register] (register "svc-2._http._tcp.local" {:reg 2})))
 
@@ -129,7 +129,7 @@
 
 (deftest concurrent-registration-test
   (testing "concurrent registrations from multiple threads are thread-safe"
-    (let [registry (create-registry)
+    (let [registry (create-service-registry)
           n 100
           tasks (mapv (fn [i]
                         (future

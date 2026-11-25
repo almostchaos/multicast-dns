@@ -3,16 +3,12 @@
     [clojure.core.async :as async :refer [alts!! offer!]]
     [dns.encoding :refer :all]
     [dns.message :refer :all]
-    [dns.multicast.service.config-server :as config-server]
-    [dns.multicast.service.registry :refer [create-registry]]
-    [org.httpkit.server :as http]
     [socket.io.udp :refer [socket]]
     [taoensso.timbre :refer [debug info warn]])
   (:gen-class))
 
 (def port 5353)
 (def address "224.0.0.251")
-(def http-port 3000)
 
 (defn- query? [message]
   (not (:QR (first message))))
@@ -24,23 +20,14 @@
       (= type:SRV type)
       (= type:TXT type))))
 
-(defn- on-term-signal [handler]
-  (.addShutdownHook
-    (Runtime/getRuntime)
-    (Thread.
-      (fn []
-        (debug "sigterm captured")
-        (handler)))))
-
 (defn- drain-channel-sequence [channel exit]
   (lazy-seq
     (let [[item port] (alts!! [channel exit])]
       (when item
         (cons item (drain-channel-sequence port exit))))))
 
-(defn listen [bind-address control]
-  (let [registry (create-registry)
-        running (atom true)
+(defn listen [service-registry host-registry bind-address]
+  (let [running (atom true)
         queried-resources (async/chan 100)]
     (socket
       bind-address
@@ -76,14 +63,6 @@
                       (catch Exception e
                         (warn "cannot respond to query," (.getMessage e)))))))
 
-              advertise
-              (fn [service-type service-instance & {host :host ip :ip port :port txt :txt ttl :ttl}]
-                (registry
-                  (fn [_ register]
-                    (register
-                      (str service-instance "." service-type)
-                      [service-type service-instance :host host :ip ip :port port :txt txt :ttl (or ttl 120)]))))
-
               stop
               (fn []
                 (debug "stopping...")
@@ -100,29 +79,8 @@
                   (run!
                     (fn [[answer queried-resource]]
                       (->>
-                        (registry (fn [lookup _] (lookup queried-resource)))
+                        (service-registry (fn [lookup _] (lookup queried-resource)))
                         (run! (fn [[_ info]] (respond answer info))))))))))
 
-          (control advertise stop)))
+          stop))
       :multicast address)))
-
-(defn -main [& args]
-  (listen
-    "0.0.0.0"
-    (fn [advertise shutdown]
-      (let [name "test"
-            host "test.local"
-            ip ["192" "168" "0" "244"]]
-        (advertise "_ssh._tcp.local" name :host host :ip ip :port 22)
-        (advertise "_airplay._tcp.local" name :host host :ip ip :port 36663)
-        (advertise "_spotify-connect._tcp.local" name :host host :ip ip :port 36663 :txt {:CPath "/zc" :VERSION "1.0" :Stack "SP"})
-        (advertise "_googlecast._tcp.local" name :host host :ip ip :port 10000)
-        (advertise "_octoprint._tcp.local" name :host host :ip ip :port 80 :txt {:bla 100}))
-      (let [app (config-server/app advertise)
-            shutdown-config-server (http/run-server app {:port http-port})]
-        (on-term-signal
-          (fn []
-            (info "shutting down...")
-            (shutdown)
-            (shutdown-config-server :timeout 100)
-            (shutdown-agents)))))))
