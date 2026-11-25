@@ -26,9 +26,9 @@
         app (service-registry
               (fn [_ advertise]
                 (advertise "_ssh._tcp.local" name {:host host :port 22})
-                (advertise "_airplay._tcp.local" name {:host host :port 36663})
-                (advertise "_spotify-connect._tcp.local" name {:host ip :port 36663 :txt {:CPath "/zc" :VERSION "1.0" :Stack "SP"}})
-                (advertise "_googlecast._tcp.local" name {:host host :port 10000})
+                (advertise "_airplay._tcp.local" name {:host host :port 5000})
+                (advertise "_spotify-connect._tcp.local" name {:host host :port 4070 :txt {:CPath "/zc" :VERSION "1.0" :Stack "SP"}})
+                (advertise "_googlecast._tcp.local" name {:host host :port 8009})
                 (advertise "_octoprint._tcp.local" name {:host host :port 80 :txt {:bla 100}})
 
                 (config-server/app advertise)))
