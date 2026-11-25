@@ -26,7 +26,7 @@
       (when item
         (cons item (drain-channel-sequence port exit))))))
 
-(defn listen [service-registry host-registry bind-address]
+(defn listen [service-registry ip-registry bind-address]
   (let [running (atom true)
         queried-resources (async/chan 100)]
     (socket
@@ -51,17 +51,20 @@
       ;;send/close
       (fn [send close]
         (let [respond
-              (fn [answer parameters]
-                (async/go
-                  (let [random-delay (long (rand 500))
-                        [type name] parameters]
-                    (try
-                      (async/<! (async/timeout random-delay))
-                      (debug "sending response for" (str name "." type))
-                      (send address port
-                            (apply answer parameters))
-                      (catch Exception e
-                        (warn "cannot respond to query," (.getMessage e)))))))
+              (fn [answer [service-type service-instance configured-info]]
+                (ip-registry
+                  (fn [lookup _]
+                    (async/go
+                      (let [random-delay (long (rand 500))
+                            ip (lookup (:host configured-info))
+                            enhanced-info (if ip
+                                            (assoc configured-info :ip ip) configured-info)]
+                        (try
+                          (async/<! (async/timeout random-delay))
+                          (debug "sending response for" (str service-instance "." service-type))
+                          (send address port (answer service-type service-instance enhanced-info))
+                          (catch Exception e
+                            (warn "cannot respond to query," (.getMessage e)))))))))
 
               stop
               (fn []
@@ -70,6 +73,7 @@
                 (close)
                 (async/close! queried-resources)
                 (debug "stopped listening"))]
+
           (future
             (info "listening...")
             (while @running

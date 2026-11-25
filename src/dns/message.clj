@@ -43,7 +43,7 @@
         :ARCOUNT 0)
       (encode-question service-path type:A class:IN))))
 
-(defn ptr-answer [service-path instance & {hostname :host ip :ip port :port txt :txt time-to-live :ttl}]
+(defn ptr-answer [service-path instance {hostname :host ip :ip port :port txt :txt time-to-live :ttl}]
   (let [priority 0
         weight 0
         service-name (split service-path dot)
@@ -77,7 +77,7 @@
       (when a-answer?
         (encode-answer host type:A class:IN ttl (encode-address-data ip))))))
 
-(defn srv-answer [service-path instance & {hostname :host ip :ip port :port txt :txt time-to-live :ttl}]
+(defn srv-answer [service-path instance {hostname :host ip :ip port :port txt :txt time-to-live :ttl}]
   (let [priority 0
         weight 0
         service-name (split service-path dot)
@@ -107,7 +107,7 @@
       (when a-answer?
         (encode-answer host type:A class:IN ttl (encode-address-data ip))))))
 
-(defn txt-answer [service-path instance & {txt :txt time-to-live :ttl}]
+(defn txt-answer [service-path instance {txt :txt time-to-live :ttl}]
   (let [service-name (split service-path dot)
         service-instance (cons instance service-name)
         ttl (or time-to-live 120)]
@@ -128,7 +128,7 @@
         :ARCOUNT 1)
       (encode-answer service-instance type:TXT class:IN ttl (encode-txt-data txt)))))
 
-(defn a-answer [_ _ & {host :host ip :ip time-to-live :ttl}]
+(defn a-answer [_ _ {host :host ip :ip time-to-live :ttl}]
   (let [ttl (or time-to-live 120)]
     (byte-array-concat
       (encode-header
