@@ -28,7 +28,7 @@
         ip-registry (create-ip-registry)
         service-registry (create-service-registry)
 
-        [service-lookup service-advertise]
+        [lookup-service advertise-service]
         (service-registry
           (fn [lookup advertise]
             (advertise "_ssh._tcp.local" name {:host host :port 22})
@@ -38,7 +38,7 @@
             (advertise "_octoprint._tcp.local" name {:host host :port 80 :txt {:bla 100}})
             [lookup advertise]))
 
-        [ip-lookup ip-advertise]
+        [lookup-ip advertise-ip]
         (ip-registry
           (fn [lookup advertise]
             (advertise host ["192" "168" "0" "244"])
@@ -46,11 +46,11 @@
 
         stop-config-server
         (http/run-server
-          (config-server/app service-advertise ip-advertise)
+          (config-server/app advertise-service advertise-ip)
           {:port http-port})
 
         stop-mdns-server
-        (server/listen service-lookup ip-lookup "0.0.0.0")]
+        (server/listen lookup-service lookup-ip "0.0.0.0")]
 
     (on-term-signal
       (fn []

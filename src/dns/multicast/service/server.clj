@@ -26,7 +26,7 @@
       (when item
         (cons item (drain-channel-sequence port exit))))))
 
-(defn listen [service-lookup ip-lookup bind-address]
+(defn listen [lookup-service lookup-ip bind-address]
   (let [running (atom true)
         queried-resources (async/chan 100)]
     (socket
@@ -56,7 +56,7 @@
               (fn [answer [service-type service-instance configured-info]]
                 (async/go
                   (let [random-delay (long (rand 500))
-                        ip (ip-lookup (:host configured-info))
+                        ip (lookup-ip (:host configured-info))
                         enhanced-info
                         (if ip
                           (assoc configured-info :ip ip) configured-info)]
@@ -84,7 +84,7 @@
                   (run!
                     (fn [[answer queried-resource]]
                       (->>
-                        (service-lookup queried-resource)
+                        (lookup-service queried-resource)
                         (run! (fn [[_ info]] (respond answer info))))))))))
 
           stop))
