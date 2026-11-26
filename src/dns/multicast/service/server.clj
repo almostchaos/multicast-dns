@@ -26,7 +26,7 @@
       (when item
         (cons item (drain-channel-sequence port exit))))))
 
-(defn listen [service-registry ip-registry bind-address]
+(defn listen [service-lookup ip-lookup bind-address]
   (let [running (atom true)
         queried-resources (async/chan 100)]
     (socket
@@ -52,19 +52,18 @@
       (fn [send close]
         (let [respond
               (fn [answer [service-type service-instance configured-info]]
-                (ip-registry
-                  (fn [lookup _]
-                    (async/go
-                      (let [random-delay (long (rand 500))
-                            ip (lookup (:host configured-info))
-                            enhanced-info (if ip
-                                            (assoc configured-info :ip ip) configured-info)]
-                        (try
-                          (async/<! (async/timeout random-delay))
-                          (debug "sending response for" (str service-instance "." service-type))
-                          (send address port (answer service-type service-instance enhanced-info))
-                          (catch Exception e
-                            (warn "cannot respond to query," (.getMessage e)))))))))
+                (async/go
+                  (let [random-delay (long (rand 500))
+                        ip (ip-lookup (:host configured-info))
+                        enhanced-info
+                        (if ip
+                          (assoc configured-info :ip ip) configured-info)]
+                    (try
+                      (async/<! (async/timeout random-delay))
+                      (debug "sending response for" (str service-instance "." service-type))
+                      (send address port (answer service-type service-instance enhanced-info))
+                      (catch Exception e
+                        (warn "cannot respond to query," (.getMessage e)))))))
 
               stop
               (fn []
@@ -83,7 +82,7 @@
                   (run!
                     (fn [[answer queried-resource]]
                       (->>
-                        (service-registry (fn [lookup _] (lookup queried-resource)))
+                        (service-lookup queried-resource)
                         (run! (fn [[_ info]] (respond answer info))))))))))
 
           stop))
