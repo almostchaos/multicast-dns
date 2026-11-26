@@ -33,14 +33,15 @@
             (advertise "_octoprint._tcp.local" name {:host host :port 80 :txt {:bla 100}})
             advertise))
 
-        ip-advertise (ip-registry
+        ip-advertise
+        (ip-registry
           (fn [_ advertise]
             (advertise host ["192" "168" "0" "244"])
             advertise))
 
         stop-config-server
         (http/run-server
-          (config-server/app service-advertise)
+          (config-server/app service-advertise ip-advertise)
           {:port http-port})
 
         stop-mdns-server

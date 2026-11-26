@@ -5,9 +5,9 @@
     [compojure.core :refer [POST routes]]
     [compojure.route :as route]))
 
-(defn app [advertise]
+(defn app [service-advertise ip-advertise]
   (routes
-    (POST "*" {:keys [body]}
+    (POST "/service" {:keys [body]}
       (if-not body
         {:status  400
          :headers {"Content-Type" "application/json"}
@@ -22,7 +22,7 @@
                 ttl (:ttl payload)]
             (if (and service-type service-instance host port)
               (do
-                (apply advertise (cond-> [service-type service-instance host (long port)]
+                (apply service-advertise (cond-> [service-type service-instance host (long port)]
                                    txt (conj :txt txt)
                                    ttl (conj :ttl (long ttl))))
                 {:status  200
@@ -38,4 +38,30 @@
             {:status  400
              :headers {"Content-Type" "application/json"}
              :body    (json/write-str {:error (.getMessage e)})}))))
+
+    (POST "/ip" {:keys [body]}
+      (if-not body
+        {:status  400
+         :headers {"Content-Type" "application/json"}
+         :body    (json/write-str {:error "Missing request body"})}
+        (try
+          (let [payload (json/read (io/reader body) :key-fn keyword)
+                hostname (or (:host payload) (:hostname payload))
+                ip (:ip payload)]
+            (if (and hostname ip)
+              (do
+                (ip-advertise hostname ip)
+                {:status  200
+                 :headers {"Content-Type" "application/json"}
+                 :body    (json/write-str {:status  "advertised"
+                                           :host    hostname
+                                           :ip    ip})})
+              {:status  400
+               :headers {"Content-Type" "application/json"}
+               :body    (json/write-str {:error "Missing required fields: hostname, ip"})}))
+          (catch Exception e
+            {:status  400
+             :headers {"Content-Type" "application/json"}
+             :body    (json/write-str {:error (.getMessage e)})}))))
+
     (route/not-found "Not found")))
