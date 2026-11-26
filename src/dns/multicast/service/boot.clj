@@ -4,7 +4,7 @@
     [dns.multicast.service.registry :refer [create-ip-registry create-service-registry]]
     [dns.multicast.service.server :as server]
     [org.httpkit.server :as http]
-    [taoensso.timbre :refer [debug info]])
+    [taoensso.timbre :refer [debug info warn]])
   (:gen-class))
 
 (def http-port 3000)
@@ -15,8 +15,12 @@
     (Thread.
       (fn []
         (debug "sigterm captured")
-        (handler)
-        (shutdown-agents)))))
+        (try
+          (handler)
+          (catch Exception e
+            (warn "failed to stop server cleanly," (.getMessage e)))
+          (finally
+            (shutdown-agents)))))))
 
 (defn -main [& args]
   (let [name "test"
