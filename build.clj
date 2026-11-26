@@ -15,8 +15,8 @@
     (b/compile-clj {:basis basis
                     :src-dirs ["src"]
                     :class-dir class-dir
-                    :ns-compile ['dns.multicast.server]})
+                    :ns-compile ['dns.multicast.service.boot]})
     (b/uber {:class-dir class-dir
              :uber-file uber-file
              :basis basis
-             :main 'dns.multicast.server})))
+             :main 'dns.multicast.service.boot})))
