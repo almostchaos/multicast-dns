@@ -32,6 +32,7 @@
     (socket
       bind-address
       port
+
       ;;receive
       (fn [_ _ packet]
         (try
@@ -48,6 +49,7 @@
                 (run! (partial offer! queried-resources)))))
           (catch Exception e
             (warn "cannot process incoming packet," (.getMessage e)))))
+
       ;;send/close
       (fn [send close]
         (let [respond

@@ -15,7 +15,8 @@
     (Thread.
       (fn []
         (debug "sigterm captured")
-        (handler)))))
+        (handler)
+        (shutdown-agents)))))
 
 (defn -main [& args]
   (let [name "test"
@@ -23,21 +24,21 @@
         ip-registry (create-ip-registry)
         service-registry (create-service-registry)
 
-        service-advertise
+        [service-lookup service-advertise]
         (service-registry
-          (fn [_ advertise]
+          (fn [lookup advertise]
             (advertise "_ssh._tcp.local" name {:host host :port 22})
             (advertise "_airplay._tcp.local" name {:host host :port 5000})
             (advertise "_spotify-connect._tcp.local" name {:host host :port 4070 :txt {:CPath "/zc" :VERSION "1.0" :Stack "SP"}})
             (advertise "_googlecast._tcp.local" name {:host host :port 8009})
             (advertise "_octoprint._tcp.local" name {:host host :port 80 :txt {:bla 100}})
-            advertise))
+            [lookup advertise]))
 
-        ip-advertise
+        [ip-lookup ip-advertise]
         (ip-registry
-          (fn [_ advertise]
+          (fn [lookup advertise]
             (advertise host ["192" "168" "0" "244"])
-            advertise))
+            [lookup advertise]))
 
         stop-config-server
         (http/run-server
@@ -45,14 +46,10 @@
           {:port http-port})
 
         stop-mdns-server
-        (server/listen
-          (service-registry (fn [lookup _] lookup))
-          (ip-registry (fn [lookup _] lookup))
-          "0.0.0.0")]
+        (server/listen service-lookup ip-lookup "0.0.0.0")]
 
     (on-term-signal
       (fn []
         (info "shutting down...")
         (stop-mdns-server)
-        (stop-config-server :timeout 100)
-        (shutdown-agents)))))
+        (stop-config-server :timeout 100)))))
