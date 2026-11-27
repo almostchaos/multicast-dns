@@ -39,52 +39,57 @@
           (catch Exception e
             (warn "cannot process incoming packet," (.getMessage e)))))
 
-    ;;send/close
-    (fn [send close]
-      (let [respond
-            (fn [answer [service-type service-instance configured-info]]
-              (async/go
-                (let [random-delay (long (rand 500))
-                      ip (lookup-ip (:host configured-info))
-                      enhanced-info
-                      (if ip
-                        (assoc configured-info :ip ip) configured-info)]
-                  (try
-                    (async/<! (async/timeout random-delay))
-                    (debug "sending response for" (str service-instance "." service-type))
-                    (send address port (answer service-type service-instance enhanced-info))
-                    (catch Exception e
-                      (warn "cannot respond to query," (.getMessage e)))))))
+      ;;send/close
+      (fn [send close]
+        (let [respond
+              (fn [answer [service-type service-instance configured-info]]
+                (async/go
+                  (let [random-delay (long (rand 50))
+                        ip (lookup-ip (:host configured-info))
+                        enhanced-info
+                        (if ip
+                          (assoc configured-info :ip ip) configured-info)]
+                    (try
+                      (async/<! (async/timeout random-delay))
+                      (debug "sending response for" (str service-instance "." service-type))
+                      (send address port (answer service-type service-instance enhanced-info))
+                      (catch Exception e
+                        (warn "cannot respond to query," (.getMessage e)))))))
 
-            stop
-            (fn []
-              (debug "stopping...")
-              (reset! running false)
-              (close)
-              (async/close! query-messages)
-              (debug "stopped listening"))]
+              stop
+              (fn []
+                (debug "stopping...")
+                (reset! running false)
+                (close)
+                (async/close! query-messages)
+                (debug "stopped listening"))]
 
-        (future
-          (info "listening...")
-          (while @running
-            (let [timed-exit (async/timeout 1000)]
-              (->>
-                (distinct (drain-channel-sequence query-messages timed-exit))
-                (run!
-                  (fn [[header & sections]]
-                    (run!
-                      (fn [{type :QTYPE resource :QNAME}]
-                        (if (= type:A type)
-                          (when-let [ip (lookup-ip resource)]
-                            (respond a-answer [resource resource {:host resource :ip ip}]))
+          (future
+            (info "listening...")
+            (while @running
+              (let [timed-exit (async/timeout 1000)]
+                (->>
+                  (distinct (drain-channel-sequence query-messages timed-exit))
+                  (run!
+                    (fn [[header & sections]]
+                      (let [query-count (:QDCOUNT header)
+                            queries (take query-count sections)]
+
+                        (if (and (= 1 query-count) (= type:A (:QTYPE (first queries))))
+
+                          (let [resource (:QNAME (first queries))]
+                            (respond a-answer ["_dns._tcp.local" resource {:host resource}]))
+
                           (run!
-                            (fn [[_ info]]
-                              (cond
-                                (= type:PTR type) (respond ptr-answer info)
-                                (= type:SRV type) (respond srv-answer info)
-                                (= type:TXT type) (respond txt-answer info)))
-                            (lookup-service resource))))
-                      (take (:QDCOUNT header) sections))))))))
+                            (fn [{type :QTYPE resource :QNAME}]
+                              (run!
+                                (fn [[_ info]]
+                                  (cond
+                                    (= type:PTR type) (respond ptr-answer info)
+                                    (= type:SRV type) (respond srv-answer info)
+                                    (= type:TXT type) (respond txt-answer info)))
+                                (lookup-service resource)))
+                            queries)))))))))
 
-        stop))
-    :multicast address)) )
+          stop))
+      :multicast address)))
