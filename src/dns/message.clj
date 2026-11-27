@@ -150,4 +150,4 @@
         :ANCOUNT 1
         :NSCOUNT 0
         :ARCOUNT 0)
-      (encode-answer host type:A class:IN ttl (encode-address-data ip)))))
+      (encode-answer (split host dot) type:A class:IN ttl (encode-address-data ip)))))

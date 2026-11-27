@@ -74,13 +74,16 @@
                   (fn [[header & sections]]
                     (run!
                       (fn [{type :QTYPE resource :QNAME}]
-                        (run!
-                          (fn [[_ info]]
-                            (cond
-                              (= type:PTR type) (respond ptr-answer info)
-                              (= type:SRV type) (respond srv-answer info)
-                              (= type:TXT type) (respond txt-answer info)))
-                          (lookup-service resource)))
+                        (if (= type:A type)
+                          (when-let [ip (lookup-ip resource)]
+                            (respond a-answer [resource resource {:host resource :ip ip}]))
+                          (run!
+                            (fn [[_ info]]
+                              (cond
+                                (= type:PTR type) (respond ptr-answer info)
+                                (= type:SRV type) (respond srv-answer info)
+                                (= type:TXT type) (respond txt-answer info)))
+                            (lookup-service resource))))
                       (take (:QDCOUNT header) sections))))))))
 
         stop))
