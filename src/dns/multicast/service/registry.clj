@@ -7,11 +7,16 @@
 
         lookup
         (fn [query]
-          (filter (fn [[name _]] (string/ends-with? name query)) @resources))
+          (filter
+            (fn [[name _]]
+              (and
+                (not (empty? name))
+                (string/ends-with? (string/lower-case name) query)))
+            @resources))
 
         register
         (fn [service-type service-instance info]
-          (let [name (str service-instance "." service-type)]
+          (let [name (string/lower-case (str service-instance "." service-type))]
             (swap! resources assoc name [service-type service-instance info])))]
 
     (fn [control] (control lookup register))))
@@ -20,10 +25,11 @@
   (let [resources (atom {})
         lookup
         (fn [hostname]
-          (get @resources hostname))
+          (when hostname
+            (get @resources (string/lower-case hostname))))
 
         register
         (fn [hostname ip]
-          (swap! resources assoc hostname ip))]
+          (swap! resources assoc (string/lower-case hostname) ip))]
 
     (fn [control] (control lookup register))))
