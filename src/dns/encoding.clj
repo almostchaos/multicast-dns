@@ -139,10 +139,11 @@
     (byte-array
       (flatten
         (map (fn [[key value]]
-               (let [property (str (name key) "=" value)]
+               (let [property (str (name key) "=" value)
+                     property-bytes (to-byte-array property)]
                  (cons
-                   (long->byte (count property))
-                   (to-byte-array property))))
+                   (long->byte (alength property-bytes))
+                   property-bytes)))
              properties)))))
 
 (defn encode-answer [service type class ttl data]
@@ -245,14 +246,16 @@
         (apply array-map (flatten (map kv->tuple texts)))))))
 
 (defn- name-storage-size [start message]
-  (if (> (alength message) start)
+  (let [msg-len (alength message)]
     (loop [position start count 0]
-      (let [value (nth message position)]
-        (cond
-          (= 0 value) (+ 1 count)
-          (= 2r11000000 (bit-and 2r11000000 value)) (+ 2 count)
-          :else (recur (inc position) (inc count)))))
-    0))
+      (if (< position msg-len)
+        (let [value (nth message position)]
+          (cond
+            (= 0 value) (+ 1 count)
+            (= 2r11000000 (bit-and 2r11000000 value)) (+ 2 count)
+            :else (let [step (+ 1 (byte->long value))]
+                    (recur (+ position step) (+ count step)))))
+        count))))
 
 (defn- decode-data [type start length message]
   (cond

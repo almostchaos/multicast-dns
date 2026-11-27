@@ -37,7 +37,20 @@
       (is (= [7 107 101 121 61 118 97 108] (map #(bit-and 0xff %) encoded)))))
   (testing "encode-txt-data with empty map or nil"
     (is (= [0] (seq (encode-txt-data {}))))
-    (is (= [0] (seq (encode-txt-data nil))))))
+    (is (= [0] (seq (encode-txt-data nil)))))
+  (testing "encode-txt-data uses UTF-8 byte lengths"
+    (let [props {:city "München" :note "🎵"}
+          encoded (encode-txt-data props)
+          header (encode-header :ID 0 :QR flag:enabled :OPCODE op-code:query
+                                :AA flag:enabled :TC flag:disabled :RD flag:disabled
+                                :RA flag:disabled :RCODE r-code:no-error
+                                :QDCOUNT 0 :ANCOUNT 1 :NSCOUNT 0 :ARCOUNT 0)
+          answer (encode-answer ["svc" "local"] type:TXT class:IN 120 encoded)
+          decoded (decode-message (byte-array-concat header answer))]
+      ;; "city=München" is 12 chars / 13 UTF-8 bytes; "note=🎵" is 6 chars / 9 UTF-8 bytes
+      (is (= 13 (bit-and 0xff (nth encoded 0))))
+      (is (= 9 (bit-and 0xff (nth encoded 14))))
+      (is (= {"city" "München" "note" "🎵"} (:RDATA (second decoded)))))))
 
 (deftest srv-encoding-test
   (testing "encode-srv-data"
@@ -158,3 +171,31 @@
           bytes (long->byte-array val)
           expected [0x12 0x34 0x56 0x78 0x90 0xAB 0xCD 0xEF]]
       (is (= expected (map #(bit-and 0xff %) bytes))))))
+
+(deftest name-storage-size-test
+  (testing "skips label-length bytes per label even when UTF-8 bytes >= 0xC0"
+    (let [q1 (encode-question ["Café" "_http" "_tcp" "local"] type:SRV class:IN)
+          ;; "Café" is 5 UTF-8 bytes (0xC3 0xA9 for é), "_http" 5, "_tcp" 4, "local" 5
+          ;; Name wire size: (1+5) + (1+5) + (1+4) + (1+5) + 1 = 24 bytes
+          name-size (#'dns.encoding/name-storage-size 0 q1)]
+      (is (= 24 name-size))))
+
+  (testing "handles compression pointer after a UTF-8 label"
+    (let [utf8-prefix (byte-array [5 67 97 102 (long->byte 0xc3) (long->byte 0xa9)
+                                   (long->byte 0xc0) (long->byte 0x0c)])]
+      (is (= 8 (#'dns.encoding/name-storage-size 0 utf8-prefix)))))
+
+  (testing "decodes multiple questions when first contains UTF-8 bytes >= 0xC0"
+    (let [header (encode-header :ID 0 :QR flag:disabled :OPCODE op-code:query
+                                :AA flag:disabled :TC flag:disabled :RD flag:disabled
+                                :RA flag:disabled :RCODE r-code:no-error
+                                :QDCOUNT 2 :ANCOUNT 0 :NSCOUNT 0 :ARCOUNT 0)
+          q1 (encode-question ["Café" "_http" "_tcp" "local"] type:SRV class:IN)
+          q2 (encode-question ["test" "local"] type:A class:IN)
+          decoded (decode-message (byte-array-concat header q1 q2))
+          decoded-q1 (second decoded)
+          decoded-q2 (nth decoded 2)]
+      (is (= "Café._http._tcp.local" (:QNAME decoded-q1)))
+      (is (= type:SRV (:QTYPE decoded-q1)))
+      (is (= "test.local" (:QNAME decoded-q2)))
+      (is (= type:A (:QTYPE decoded-q2))))))
