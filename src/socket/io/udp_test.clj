@@ -11,8 +11,8 @@
     (.getLocalPort s)))
 
 (deftest max-payload-constant-test
-  (testing "max-payload is standard DNS over UDP payload size"
-    (is (= 508 max-payload))))
+  (testing "max-payload supports mDNS packets up to standard MTU"
+    (is (= 1500 max-payload))))
 
 (deftest socket-creation-and-lifecycle-test
   (testing "socket provides send and close functions to control callback"
@@ -103,7 +103,7 @@
                   (close-receiver)
                   (close-sender)))))))))
 
-  (testing "payload at max-payload boundary (508 bytes)"
+  (testing "payload at max-payload boundary (1500 bytes)"
     (let [port (free-port)
           received (promise)
           receiver (fn [_ _ data]

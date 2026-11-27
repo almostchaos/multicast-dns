@@ -9,6 +9,7 @@
   (let [path (split service-path dot)]
     (byte-array-concat
       (encode-header
+        :ID 0
         :QR flag:disabled
         :OPCODE op-code:query
         :AA flag:disabled
@@ -56,9 +57,10 @@
 
     (byte-array-concat
       (encode-header
+        :ID 0
         :QR flag:enabled
         :OPCODE op-code:query
-        :AA flag:disabled
+        :AA flag:enabled
         :TC flag:disabled
         :RD flag:disabled
         :RA flag:disabled
@@ -88,9 +90,10 @@
         txt-answer? (not (empty? txt))]
     (byte-array-concat
       (encode-header
+        :ID 0
         :QR flag:enabled
         :OPCODE op-code:query
-        :AA flag:disabled
+        :AA flag:enabled
         :TC flag:disabled
         :RD flag:disabled
         :RA flag:disabled
@@ -113,9 +116,10 @@
         ttl (or time-to-live 120)]
     (byte-array-concat
       (encode-header
+        :ID 0
         :QR flag:enabled
         :OPCODE op-code:query
-        :AA flag:disabled
+        :AA flag:enabled
         :TC flag:disabled
         :RD flag:disabled
         :RA flag:disabled
@@ -125,16 +129,17 @@
         :QDCOUNT 0
         :ANCOUNT 1
         :NSCOUNT 0
-        :ARCOUNT 1)
+        :ARCOUNT 0)
       (encode-answer service-instance type:TXT class:IN ttl (encode-txt-data txt)))))
 
 (defn a-answer [_ _ {host :host ip :ip time-to-live :ttl}]
   (let [ttl (or time-to-live 120)]
     (byte-array-concat
       (encode-header
+        :ID 0
         :QR flag:enabled
         :OPCODE op-code:query
-        :AA flag:disabled
+        :AA flag:enabled
         :TC flag:disabled
         :RD flag:disabled
         :RA flag:disabled
@@ -144,5 +149,5 @@
         :QDCOUNT 0
         :ANCOUNT 1
         :NSCOUNT 0
-        :ARCOUNT 1)
+        :ARCOUNT 0)
       (encode-answer host type:A class:IN ttl (encode-address-data ip)))))

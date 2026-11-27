@@ -138,7 +138,7 @@
                   (close-receiver)
                   (close-sender)))))))))
 
-  (testing "payload at max-payload boundary (508 bytes) (nio/socket)"
+  (testing "payload at max-payload boundary (1500 bytes) (nio/socket)"
     (let [port (free-port)
           received (promise)
           receiver (fn [_ _ data]

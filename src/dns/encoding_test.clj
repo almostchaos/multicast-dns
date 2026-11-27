@@ -84,7 +84,15 @@
       ;; but were passed as boolean-arrays in encode-header.
       ;; op-code:query is (byte->4-bits 0) -> [false false false false]
       (is (= 0 (:OPCODE decoded-header)))
-      (is (= 0 (:RCODE decoded-header))))))
+      (is (= 0 (:RCODE decoded-header))))
+
+    (doseq [id [0 0x1234]]
+      (let [encoded (encode-header :ID id :QR flag:enabled :OPCODE op-code:query
+                                   :AA flag:enabled :TC flag:disabled :RD flag:disabled
+                                   :RA flag:disabled :RCODE r-code:no-error
+                                   :QDCOUNT 0 :ANCOUNT 0 :NSCOUNT 0 :ARCOUNT 0)
+            decoded-header (first (decode-message encoded))]
+        (is (= id (:ID decoded-header)))))))
 
 (deftest message-round-trip-test
   (testing "Full message round-trip"

@@ -9,6 +9,7 @@
         decoded (encoding/decode-message message)
         header (first decoded)
         question (second decoded)]
+    (is (= 0 (:ID header)))
     (is (= 1 (:QDCOUNT header)))
     (is (= 0 (:ANCOUNT header)))
     (is (= service-path (:QNAME question)))
@@ -38,6 +39,8 @@
           decoded (encoding/decode-message message)
           header (first decoded)
           answers (rest decoded)]
+      (is (= 0 (:ID header)))
+      (is (true? (:AA header)))
       (is (= 1 (:ANCOUNT header)))
       (is (= 2 (:ARCOUNT header)))
       (is (= 3 (count answers)))
@@ -124,6 +127,8 @@
           decoded (encoding/decode-message message)
           header (first decoded)
           answers (rest decoded)]
+      (is (= 0 (:ID header)))
+      (is (true? (:AA header)))
       (is (= 1 (:ANCOUNT header)))
       (is (= 1 (:ARCOUNT header)))
       (is (= 2 (count answers)))
@@ -172,8 +177,10 @@
           decoded (encoding/decode-message message)
           header (first decoded)
           answers (rest decoded)]
+      (is (= 0 (:ID header)))
+      (is (true? (:AA header)))
       (is (= 1 (:ANCOUNT header)))
-      (is (= 1 (:ARCOUNT header)))
+      (is (= 0 (:ARCOUNT header)))
       (is (= 1 (count answers)))
       (is (= encoding/type:TXT (:TYPE (first answers))))
       (is (= {"id" "123"} (:RDATA (first answers))))))
@@ -186,6 +193,7 @@
           header (first decoded)
           answers (rest decoded)]
       (is (= 1 (:ANCOUNT header)))
+      (is (= 0 (:ARCOUNT header)))
       (is (= 1 (count answers)))
       (is (= encoding/type:TXT (:TYPE (first answers))))
       (is (= {} (:RDATA (first answers))))))
@@ -199,6 +207,7 @@
             header (first decoded)
             answers (rest decoded)]
         (is (= 1 (:ANCOUNT header)))
+        (is (= 0 (:ARCOUNT header)))
         (is (= 1 (count answers)))
         (is (= encoding/type:TXT (:TYPE (first answers))))
         (is (= {} (:RDATA (first answers))))))))
@@ -210,7 +219,10 @@
           header (first decoded)
           answers (rest decoded)
           a-record (first answers)]
+      (is (= 0 (:ID header)))
+      (is (true? (:AA header)))
       (is (= 1 (:ANCOUNT header)))
+      (is (= 0 (:ARCOUNT header)))
       (is (= 1 (count answers)))
       (is (= "my-host.local" (:NAME a-record)))
       (is (= encoding/type:A (:TYPE a-record)))
@@ -220,7 +232,11 @@
   (testing "A answer with custom TTL"
     (let [message (a-answer nil nil {:host ["my-host" "local"] :ip ["10" "0" "0" "1"] :ttl 60})
           decoded (encoding/decode-message message)
+          header (first decoded)
           a-record (second decoded)]
+      (is (= 0 (:ID header)))
+      (is (true? (:AA header)))
+      (is (= 0 (:ARCOUNT header)))
       (is (= "my-host.local" (:NAME a-record)))
       (is (= encoding/type:A (:TYPE a-record)))
       (is (= 60 (:TTL a-record)))

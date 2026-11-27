@@ -4,7 +4,7 @@
   (:import
     (java.net DatagramPacket DatagramSocket InetAddress InetSocketAddress MulticastSocket NetworkInterface)))
 
-(def max-payload 508)
+(def max-payload 1500)
 
 (defn socket
   "Opens a unicast or multicast UDP socket and begins listening asynchronously.

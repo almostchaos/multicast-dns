@@ -75,6 +75,9 @@
 
 (defn encode-header [& parameters]
   (let [header (apply hash-map parameters)
+        [id-ms id-ls] (if (contains? header :ID)
+                        (drop 6 (long->byte-array (:ID header)))
+                        [(rand-byte) (rand-byte)])
         qr (:QR header)
         [op-code-3 op-code-2 op-code-1 op-code-0] (:OPCODE header)
         aa (:AA header)
@@ -88,8 +91,8 @@
         [ar-count-ms ar-count-ls] (drop 6 (long->byte-array (:ARCOUNT header)))]
     (byte-array
       (let [value (bits->byte [qr op-code-3 op-code-2 op-code-1 op-code-0 aa tc rd])]
-        [(rand-byte)
-         (rand-byte)
+        [id-ms
+         id-ls
          value
          (bits->byte [ra false false false r-code-3 r-code-2 r-code-1 r-code-0])
          qd-count-ms qd-count-ls
